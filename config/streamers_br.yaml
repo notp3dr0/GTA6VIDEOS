@@ -30,12 +30,18 @@ capture_settings:
   strict_gta6_only_filter: true             # Ignora lives/vídeos de GTA 5 RP, CS2, Roblox, etc.
   live_hype_monitor:
     enabled: true                           # Monitor de picos ao vivo estilo Real Oficial / OpusClip Live
-    poll_interval_sec: 20                   # Checa novos blocos de 6s do buffer circular a cada 20s
-    ring_segment_sec: 6                     # Fatias de 6s em disco (-segment_wrap 24 = máx ~2.4 min / ~80 MB em SSD)
+    poll_interval_sec: 20                   # Checa novos blocos de 6s de TODAS as lives simultâneas a cada 20s
+    max_concurrent_lives: 5                 # Pós-live 25h: monitora até 5 lives BR simultâneas em paralelo (~400 MB SSD / <3% CPU)
+    stream_copy_ingest: true                # Usa FFmpeg `-c copy` no buffer circular (~0.2% CPU por live, sem re-encodar na entrada)
+    live_discovery_refresh_sec: 180         # Atualiza lista de quem entrou/saiu de live a cada 3 min (fecha buffers offline sozinho)
+    ring_segment_sec: 6                     # Fatias de 6s em disco (-segment_wrap 24 = máx ~2.4 min / ~80 MB por live em SSD)
     ring_wrap_segments: 24                  # Nunca enche o HD do 2º PC nos 5 dias
     retroactive_lookback_sec: 25            # Clipa ~18s ANTES do grito/risada + ~7s da reação!
     spike_threshold: 58.0                   # Score mínimo [0..100] somando pico de voz/risada (dB) + ação visual + chat ("CLIPA"/"KKKK")
-    min_minutes_between_instant_clips: 8.0  # Cooldown anti-spam entre clipes instantâneos
+    max_instant_clips_per_tick: 2           # Se 2+ lives explodirem no mesmo minuto, publica até 2 cortes roteados p/ canais diferentes
+    min_minutes_between_instant_clips: 4.0  # Espaçamento global mínimo entre lotes de cortes instantâneos
+    min_minutes_per_streamer: 12.0          # Cooldown individual por streamer (evita 1 streamer gritalhão monopolizar os 5 canais)
+
 
 
 streamers_br:

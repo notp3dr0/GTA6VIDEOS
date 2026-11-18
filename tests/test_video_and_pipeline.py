@@ -619,4 +619,102 @@ async def test_live_hype_monitor_detects_scream_stitches_retroactive_replay_and_
     assert "live_hype_monitor_20s" in {j["id"] for j in jobs}
 
 
+@pytest.mark.asyncio
+async def test_multi_live_simultaneous_hype_monitor_routes_to_distinct_channels_and_prunes_offline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Post-25h Phase 2: monitors multiple simultaneous BR lives, routes concurrent spikes to distinct thematic channels, and prunes offline buffers."""
+    from gta6_agents.agents.live_hype_monitor import RollingLiveRingBuffer
+
+    cfg = _make_pipeline_test_config(tmp_path)
+    store = StateStore(cfg.data_dir, cfg.memory_dir)
+    orchestrator = MultiAgentOrchestrator(cfg, store)
+
+    # Simulate Phase 2 (after 25h KY4DWumZffg live has ended)
+    monkeypatch.setattr(orchestrator.scout, "_is_campaign_blocked_now", lambda _block: True)
+
+    async def _fake_discover_br_lives(blacklist, blocked_kw, max_streamers=10):
+        return [
+            SourceCandidate(
+                title="SKORPION AO VIVO EM LEONIDA",
+                url="https://www.youtube.com/watch?v=skorpLive1#live-0",
+                creator_handle="@SkorpionOFICIAL",
+                source_type="youtube",
+                metadata={
+                    "is_live": True,
+                    "canonical_url": "https://www.youtube.com/watch?v=skorpLive1",
+                    "streamer_name": "Skorpion Gamer",
+                },
+            ),
+            SourceCandidate(
+                title="ALANZOKA AO VIVO JOGANDO GTA 6",
+                url="https://www.twitch.tv/alanzoka#live-0",
+                creator_handle="@alanzoka",
+                source_type="twitch",
+                metadata={
+                    "is_live": True,
+                    "canonical_url": "https://www.twitch.tv/alanzoka",
+                    "streamer_name": "Alanzoka",
+                },
+            ),
+            # Duplicate slice of Alanzoka must deduplicate to 1 ring buffer per streamer!
+            SourceCandidate(
+                title="ALANZOKA AO VIVO JOGANDO GTA 6 SLICE 2",
+                url="https://www.twitch.tv/alanzoka#live-1",
+                creator_handle="@alanzoka",
+                source_type="twitch",
+                metadata={
+                    "is_live": True,
+                    "canonical_url": "https://www.twitch.tv/alanzoka",
+                    "streamer_name": "Alanzoka",
+                },
+            ),
+            SourceCandidate(
+                title="CORINGA FUGA INSANA AO VIVO EM VICE CITY",
+                url="https://www.twitch.tv/loud_coringa#live-0",
+                creator_handle="@loud_coringa",
+                source_type="twitch",
+                metadata={
+                    "is_live": True,
+                    "canonical_url": "https://www.twitch.tv/loud_coringa",
+                    "streamer_name": "LOUD Coringa",
+                },
+            ),
+        ]
+
+    monkeypatch.setattr(orchestrator.scout, "discover_br_streamer_streams", _fake_discover_br_lives)
+
+    mon_cfg = orchestrator.hype_monitor._monitor_settings()
+    targets = await orchestrator.hype_monitor._discover_active_targets(orchestrator.scout, mon_cfg)
+    assert len(targets) == 3
+    assert [t["creator_handle"] for t in targets] == [
+        "@SkorpionOFICIAL",
+        "@alanzoka",
+        "@loud_coringa",
+    ]
+    assert targets[1]["twitch_login"] == "alanzoka"
+    assert targets[2]["twitch_login"] == "loud_coringa"
+
+    # Verify smart thematic routing assigns non-colliding channels when 2+ lives pop off simultaneously!
+    channels = orchestrator.multi_channel.load_channels()
+    used_in_tick: set[str] = set()
+    ch_funny = orchestrator.hype_monitor.select_channel_for_category("engracado", channels, used_in_tick)
+    ch_epic = orchestrator.hype_monitor.select_channel_for_category("jogada_epica", channels, used_in_tick)
+    ch_funny_2 = orchestrator.hype_monitor.select_channel_for_category("engracado", channels, used_in_tick)
+    assert ch_funny == "ch5_vice_stories"
+    assert ch_epic == "ch3_gta6_dicas_pro"
+    assert ch_funny_2 not in {ch_funny, ch_epic}
+
+    # Verify offline buffer pruning closes stale FFmpeg ring buffers cleanly
+    orchestrator.hype_monitor._buffers["SkorpionOFICIAL"] = RollingLiveRingBuffer("SkorpionOFICIAL", tmp_path)
+    orchestrator.hype_monitor._buffers["alanzoka"] = RollingLiveRingBuffer("alanzoka", tmp_path)
+    orchestrator.hype_monitor._buffers["loud_coringa"] = RollingLiveRingBuffer("loud_coringa", tmp_path)
+
+    pruned_count = await orchestrator.hype_monitor.prune_inactive_buffers({"SkorpionOFICIAL", "alanzoka"})
+    assert pruned_count == 1
+    assert set(orchestrator.hype_monitor._buffers.keys()) == {"SkorpionOFICIAL", "alanzoka"}
+
+
+
 

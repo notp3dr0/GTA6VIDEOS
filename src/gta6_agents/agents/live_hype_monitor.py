@@ -251,8 +251,8 @@ class RollingLiveRingBuffer:
     def is_running(self) -> bool:
         return self._proc is not None and self._proc.returncode is None
 
-    async def ensure_buffering(self, live_url: str) -> bool:
-        """Start (or restart) the background FFmpeg `.ts` ring buffer on `live_url`."""
+    async def ensure_buffering(self, live_url: str, *, stream_copy: bool = True) -> bool:
+        """Start (or restart) the background FFmpeg `.ts` ring buffer on `live_url` (~0.2% CPU w/ `-c copy`)."""
         clean_url = (live_url or "").strip().split("#", 1)[0]
         if not clean_url:
             return False
@@ -299,20 +299,29 @@ class RollingLiveRingBuffer:
                     "1:a:0",
                 ]
             )
+        if stream_copy and len(direct_urls) == 1:
+            cmd.extend(["-c", "copy"])
+        elif stream_copy:
+            cmd.extend(["-c:v", "copy", "-c:a", "aac", "-b:a", "160k"])
+        else:
+            cmd.extend(
+                [
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "ultrafast",
+                    "-crf",
+                    "21",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "160k",
+                ]
+            )
         cmd.extend(
             [
-                "-c:v",
-                "libx264",
-                "-preset",
-                "ultrafast",
-                "-crf",
-                "21",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "160k",
                 "-f",
                 "segment",
                 "-segment_time",
@@ -429,6 +438,9 @@ class LiveHypeMonitorAgent:
         self._baselines_db: dict[str, float] = {}
         self._last_analyzed_mtime: dict[str, float] = {}
         self._last_instant_clip_mono: float = 0.0
+        self._last_streamer_clip_mono: dict[str, float] = {}
+        self._cached_live_targets: list[dict[str, Any]] = []
+        self._last_discovery_mono: float = 0.0
         self._channel_rr_index: int = 0
 
     def _monitor_settings(self) -> dict[str, Any]:
@@ -617,55 +629,148 @@ class LiveHypeMonitorAgent:
         )
         return analysis, candidate
 
-    async def poll_active_live_once(self, orchestrator: Any) -> dict[str, Any]:
-        """Single 20s monitoring tick invoked by DailyScheduler: buffers active live & auto-clips hype spikes."""
-        mon_cfg = self._monitor_settings()
-        if not bool(mon_cfg.get("enabled", True)) or self.config.dry_run:
-            return {"status": "idle_dry_run"}
+    async def prune_inactive_buffers(self, active_keys: set[str]) -> int:
+        """Stop & remove FFmpeg ring buffers for streamers who went offline so zero orphan processes remain."""
+        stale_keys = [k for k in list(self._buffers.keys()) if k not in active_keys]
+        for k in stale_keys:
+            ring = self._buffers.pop(k, None)
+            if ring is not None:
+                await ring.stop()
+        return len(stale_keys)
 
-        cooldown_min = float(mon_cfg.get("min_minutes_between_instant_clips", 8.0))
-        if (
-            self._last_instant_clip_mono > 0.0
-            and (time.monotonic() - self._last_instant_clip_mono) < (cooldown_min * 60.0)
-        ):
-            return {"status": "cooldown"}
+    def select_channel_for_category(
+        self,
+        category: str,
+        channels: list[Any],
+        used_in_tick: set[str],
+    ) -> str:
+        """Route simultaneous hype clips to their ideal thematic channel (`ch1..ch5`) without colliding."""
+        if not channels:
+            return ""
+        preferred_Hints: dict[str, tuple[str, ...]] = {
+            "engracado": ("ch5_", "resenha", "stories"),
+            "jogada_epica": ("ch3_", "plays", "ch4_", "motores"),
+            "reacao_choque": ("ch1_", "plantao", "corteslive"),
+            "momento_marcante": ("ch2_", "radar", "segredos"),
+        }
+        hints = preferred_Hints.get(category, ())
+        for ch in channels:
+            cid = str(getattr(ch, "channel_id", "") or "")
+            handle = str(getattr(ch, "handle", "") or "").lower()
+            if cid in used_in_tick:
+                continue
+            if any(h in cid.lower() or h in handle for h in hints):
+                used_in_tick.add(cid)
+                return cid
 
-        spike_threshold = float(mon_cfg.get("spike_threshold", 58.0))
-        scout = orchestrator.scout
+        # Fallback: next unused channel in round-robin order
+        for _ in range(len(channels)):
+            chosen = channels[self._channel_rr_index % len(channels)]
+            self._channel_rr_index += 1
+            cid = str(getattr(chosen, "channel_id", "") or "")
+            if cid and cid not in used_in_tick:
+                used_in_tick.add(cid)
+                return cid
 
+        chosen = channels[self._channel_rr_index % len(channels)]
+        self._channel_rr_index += 1
+        return str(getattr(chosen, "channel_id", "") or "")
+
+    async def _discover_active_targets(
+        self,
+        scout: Any,
+        mon_cfg: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Return 1 target (`KY4DWumZffg`) during Phase 1 campaign, or up to `max_concurrent_lives` BR lives in Phase 2."""
         raw_campaign = self.config.campaign if isinstance(self.config.campaign, dict) else {}
         c_block = raw_campaign.get("campaign", raw_campaign) if isinstance(raw_campaign, dict) else {}
 
-        target_url = ""
-        creator_handle = "@YouTube"
-        streamer_name = "Live Oficial GTA VI"
-        for_campaign = False
-        twitch_login = ""
-
-        # Phase 1: Monitor KY4DWumZffg while official Real Oficial 25h broadcast is ON AIR
+        # Phase 1: Official 25h YouTube x GTA VI broadcast (exclusive single source)
         if self.config.real_oficial_enabled and c_block and not scout._is_campaign_blocked_now(c_block):
             auth_live = c_block.get("authorized_live", {}) if isinstance(c_block, dict) else {}
-            target_url = str(auth_live.get("url") or "https://www.youtube.com/watch?v=KY4DWumZffg").strip()
-            creator_handle = "@YouTube"
-            streamer_name = "Skorpion & YouTube GTA VI"
-            for_campaign = True
-        else:
-            # Phase 2: Monitor whichever Brazilian streamer is currently LIVE playing GTA VI!
-            _, blacklist, blocked_kw = scout._load_creator_lists()
-            live_cands = await scout.discover_br_streamer_streams(blacklist, blocked_kw, max_streamers=6)
-            active_live = next((c for c in live_cands if c.metadata.get("is_live")), None)
-            if active_live is not None:
-                target_url = str(active_live.metadata.get("canonical_url") or active_live.url.split("#", 1)[0])
-                creator_handle = active_live.creator_handle
-                streamer_name = str(active_live.metadata.get("streamer_name") or creator_handle.lstrip("@"))
-                for_campaign = False
-                if "twitch.tv/" in target_url.lower():
-                    twitch_login = target_url.rstrip("/").split("/")[-1].split("?")[0]
+            url = str(auth_live.get("url") or "https://www.youtube.com/watch?v=KY4DWumZffg").strip()
+            return [
+                {
+                    "stream_key": "ky4_official",
+                    "target_url": url,
+                    "creator_handle": "@YouTube",
+                    "streamer_name": "Skorpion & YouTube GTA VI",
+                    "for_campaign": True,
+                    "twitch_login": "",
+                }
+            ]
 
-        if not target_url:
-            return {"status": "no_active_live"}
+        # Phase 2: Post-25h — Discover ALL currently LIVE Brazilian streamers (cached every 3m)
+        max_concurrent = max(1, int(mon_cfg.get("max_concurrent_lives", 5)))
+        refresh_sec = max(30.0, float(mon_cfg.get("live_discovery_refresh_sec", 180.0)))
+        now_mono = time.monotonic()
 
-        stream_key = re.sub(r"[^A-Za-z0-9_-]", "_", creator_handle.lstrip("@") or "ky4")[:24]
+        if (
+            self._cached_live_targets
+            and self._last_discovery_mono > 0.0
+            and (now_mono - self._last_discovery_mono) < refresh_sec
+        ):
+            return self._cached_live_targets[:max_concurrent]
+
+        _, blacklist, blocked_kw = scout._load_creator_lists()
+        live_cands = await scout.discover_br_streamer_streams(
+            blacklist,
+            blocked_kw,
+            max_streamers=10,
+        )
+
+        targets: list[dict[str, Any]] = []
+        seen_handles: set[str] = set()
+        for cand in live_cands:
+            if not cand.metadata.get("is_live"):
+                continue
+            handle_norm = (cand.creator_handle or "").strip().lower()
+            if not handle_norm or handle_norm in seen_handles:
+                continue
+            seen_handles.add(handle_norm)
+
+            t_url = str(cand.metadata.get("canonical_url") or cand.url.split("#", 1)[0]).strip()
+            if not t_url:
+                continue
+            tw_login = ""
+            if "twitch.tv/" in t_url.lower():
+                tw_login = t_url.rstrip("/").split("/")[-1].split("?")[0]
+
+            s_key = re.sub(r"[^A-Za-z0-9_-]", "_", cand.creator_handle.lstrip("@") or "live")[:24]
+            s_name = str(cand.metadata.get("streamer_name") or cand.creator_handle.lstrip("@"))
+            targets.append(
+                {
+                    "stream_key": s_key,
+                    "target_url": t_url,
+                    "creator_handle": cand.creator_handle,
+                    "streamer_name": s_name,
+                    "for_campaign": False,
+                    "twitch_login": tw_login,
+                }
+            )
+            if len(targets) >= max_concurrent:
+                break
+
+        self._cached_live_targets = targets
+        self._last_discovery_mono = now_mono
+        return targets
+
+    async def _poll_single_target(
+        self,
+        target: dict[str, Any],
+        mon_cfg: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Buffer & evaluate the newest 6s chunk of a single live stream inside the concurrent pool."""
+        stream_key = str(target["stream_key"])
+        target_url = str(target["target_url"])
+        creator_handle = str(target["creator_handle"])
+        streamer_name = str(target["streamer_name"])
+        for_campaign = bool(target["for_campaign"])
+        twitch_login = str(target.get("twitch_login") or "")
+        spike_threshold = float(mon_cfg.get("spike_threshold", 58.0))
+        stream_copy = bool(mon_cfg.get("stream_copy_ingest", True))
+        per_streamer_cd_sec = float(mon_cfg.get("min_minutes_per_streamer", 12.0)) * 60.0
+
         ring = self._buffers.get(stream_key)
         if ring is None:
             ring = RollingLiveRingBuffer(
@@ -676,19 +781,24 @@ class LiveHypeMonitorAgent:
             )
             self._buffers[stream_key] = ring
 
-        buffering_ok = await ring.ensure_buffering(target_url)
+        buffering_ok = await ring.ensure_buffering(target_url, stream_copy=stream_copy)
         if not buffering_ok:
-            return {"status": "stream_offline", "target_url": target_url}
+            return {"stream_key": stream_key, "streamer": streamer_name, "status": "stream_offline"}
 
         chunks = ring.list_completed_chunks()
         if not chunks:
-            return {"status": "warming_ring_buffer", "target_url": target_url}
+            return {"stream_key": stream_key, "streamer": streamer_name, "status": "warming_ring_buffer"}
 
         newest_chunk = chunks[-1]
         newest_mtime = newest_chunk.stat().st_mtime
         if newest_mtime <= self._last_analyzed_mtime.get(stream_key, 0.0):
-            return {"status": "awaiting_next_chunk", "target_url": target_url}
+            return {"stream_key": stream_key, "streamer": streamer_name, "status": "awaiting_next_chunk"}
         self._last_analyzed_mtime[stream_key] = newest_mtime
+
+        # Check per-streamer anti-spam cooldown (still update vocal baseline on calm chunks if needed)
+        last_st_clip = self._last_streamer_clip_mono.get(stream_key, 0.0)
+        if last_st_clip > 0.0 and (time.monotonic() - last_st_clip) < per_streamer_cd_sec:
+            return {"stream_key": stream_key, "streamer": streamer_name, "status": "streamer_cooldown"}
 
         analysis, instant_cand = await self.evaluate_buffered_chunk(
             stream_key=stream_key,
@@ -702,50 +812,137 @@ class LiveHypeMonitorAgent:
             spike_threshold=spike_threshold,
             sample_chat=bool(twitch_login),
         )
+        return {
+            "stream_key": stream_key,
+            "target_url": target_url,
+            "streamer": streamer_name,
+            "for_campaign": for_campaign,
+            "status": "triggered" if instant_cand is not None else "monitoring",
+            "analysis": analysis,
+            "candidate": instant_cand,
+        }
 
+    async def poll_active_live_once(self, orchestrator: Any) -> dict[str, Any]:
+        """20s multi-stream tick: monitors up to `max_concurrent_lives` simultaneous lives & routes hype clips across `ch1..ch5`."""
+        mon_cfg = self._monitor_settings()
+        if not bool(mon_cfg.get("enabled", True)) or self.config.dry_run:
+            return {"status": "idle_dry_run"}
+
+        cooldown_min = float(mon_cfg.get("min_minutes_between_instant_clips", 4.0))
+        if (
+            self._last_instant_clip_mono > 0.0
+            and (time.monotonic() - self._last_instant_clip_mono) < (cooldown_min * 60.0)
+        ):
+            return {"status": "cooldown"}
+
+        targets = await self._discover_active_targets(orchestrator.scout, mon_cfg)
+        active_keys = {str(t["stream_key"]) for t in targets}
+        pruned = await self.prune_inactive_buffers(active_keys)
+
+        if not targets:
+            return {"status": "no_active_live", "pruned_buffers": pruned}
+
+        # Evaluate ALL simultaneous active lives in parallel!
+        stream_outcomes = await asyncio.gather(
+            *(self._poll_single_target(t, mon_cfg) for t in targets),
+            return_exceptions=True,
+        )
+
+        valid_outcomes: list[dict[str, Any]] = []
+        triggered_outcomes: list[dict[str, Any]] = []
+        for out in stream_outcomes:
+            if isinstance(out, Exception) or not isinstance(out, dict):
+                continue
+            valid_outcomes.append(out)
+            if out.get("candidate") is not None and out.get("analysis") is not None:
+                triggered_outcomes.append(out)
+
+        # Persist multi-live telemetry snapshot for Dashboard & Telegram `/status`
         self.store.set_flag(
             "last_hype_monitor_json",
             json.dumps(
                 {
                     "checked_at": datetime.now(timezone.utc).isoformat(),
-                    "target_url": target_url,
-                    "streamer": streamer_name,
-                    "composite_spike_score": analysis.composite_spike_score,
-                    "rms_jump_db": analysis.rms_jump_db,
-                    "chat_hype_hits": analysis.chat_hype_hits,
-                    "triggered": analysis.triggered,
+                    "active_simultaneous_lives": len(targets),
+                    "pruned_offline_buffers": pruned,
+                    "streams": [
+                        {
+                            "streamer": o.get("streamer"),
+                            "status": o.get("status"),
+                            "score": (
+                                o["analysis"].composite_spike_score
+                                if isinstance(o.get("analysis"), HypeSpikeAnalysis)
+                                else 0.0
+                            ),
+                        }
+                        for o in valid_outcomes
+                    ],
                 },
                 ensure_ascii=False,
             ),
         )
 
-        if instant_cand is None:
+        if not triggered_outcomes:
             return {
                 "status": "monitoring",
-                "target_url": target_url,
-                "score": analysis.composite_spike_score,
+                "active_simultaneous_lives": len(targets),
+                "pruned_buffers": pruned,
             }
 
-        # Hype moment detected! Pick next rotating channel & dispatch immediate render + publish!
-        self._last_instant_clip_mono = time.monotonic()
-        target_ch_id = ""
-        if getattr(orchestrator, "multi_channel", None) is not None:
-            channels = orchestrator.multi_channel.load_channels()
-            if channels:
-                chosen = channels[self._channel_rr_index % len(channels)]
-                self._channel_rr_index += 1
-                target_ch_id = chosen.channel_id
-                instant_cand.metadata["target_channel_id"] = target_ch_id
-
-        res = await orchestrator._process_candidate(
-            instant_cand,
-            include_campaign=for_campaign,
-            demo_video_fallback=False,
+        # Rank simultaneous spikes highest-first & dispatch up to `max_instant_clips_per_tick` to distinct channels!
+        triggered_outcomes.sort(
+            key=lambda o: float(o["analysis"].composite_spike_score),
+            reverse=True,
         )
+        max_per_tick = max(1, int(mon_cfg.get("max_instant_clips_per_tick", 2)))
+        selected_spikes = triggered_outcomes[:max_per_tick]
+
+        channels = (
+            orchestrator.multi_channel.load_channels()
+            if getattr(orchestrator, "multi_channel", None) is not None
+            else []
+        )
+        used_channels: set[str] = set()
+        now_mono = time.monotonic()
+        self._last_instant_clip_mono = now_mono
+
+        dispatched: list[dict[str, Any]] = []
+        for item in selected_spikes:
+            cand: SourceCandidate = item["candidate"]
+            analysis: HypeSpikeAnalysis = item["analysis"]
+            s_key = str(item["stream_key"])
+            self._last_streamer_clip_mono[s_key] = now_mono
+
+            target_ch_id = self.select_channel_for_category(
+                analysis.hype_category,
+                channels,
+                used_channels,
+            )
+            if target_ch_id:
+                cand.metadata["target_channel_id"] = target_ch_id
+
+            res = await orchestrator._process_candidate(
+                cand,
+                include_campaign=bool(item["for_campaign"]),
+                demo_video_fallback=False,
+            )
+            dispatched.append(
+                {
+                    "streamer": item["streamer"],
+                    "category": analysis.hype_category,
+                    "score": analysis.composite_spike_score,
+                    "channel_id": target_ch_id,
+                    "result": res,
+                }
+            )
+
+        first = dispatched[0]
         return {
             "status": "instant_clip_triggered",
-            "category": analysis.hype_category,
-            "score": analysis.composite_spike_score,
-            "channel_id": target_ch_id,
-            "result": res,
+            "active_simultaneous_lives": len(targets),
+            "dispatched_count": len(dispatched),
+            "category": first["category"],
+            "score": first["score"],
+            "channel_id": first["channel_id"],
+            "dispatched": dispatched,
         }
