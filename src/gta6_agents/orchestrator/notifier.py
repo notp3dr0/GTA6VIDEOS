@@ -124,15 +124,25 @@ class RemoteNotifier:
         title: str,
         lines: list[str],
         level: str = "info",
+        copy_code_block: str | None = None,
     ) -> dict[str, bool]:
         """Broadcast a rich formatted alert to configured Telegram and Discord channels."""
         escaped_title = html.escape(title)
         escaped_lines = [html.escape(line) for line in lines]
         tg_html = f"<b>{escaped_title}</b>\n\n" + "\n".join(escaped_lines)
         plain = f"{title}\n\n" + "\n".join(lines)
+        if copy_code_block:
+            tg_html += (
+                f"\n\n📌 <b>Toque p/ copiar e FIXAR no 1º comentário:</b>\n"
+                f"<code>{html.escape(copy_code_block)}</code>"
+            )
+            plain += f"\n\n📌 Copie e FIXE no 1º comentário:\n{copy_code_block}"
 
         tg_ok = await self._send_telegram(tg_html, plain_fallback=plain)
-        dc_ok = await self._send_discord(title=title, description="\n".join(lines), level=level)
+        dc_desc = "\n".join(lines)
+        if copy_code_block:
+            dc_desc += f"\n\n📌 **Fixar no 1º comentário:** `{copy_code_block}`"
+        dc_ok = await self._send_discord(title=title, description=dc_desc, level=level)
         return {"telegram": tg_ok, "discord": dc_ok}
 
     async def notify_published(
@@ -144,10 +154,13 @@ class RemoteNotifier:
         if not publications:
             return {"telegram": False, "discord": False}
 
+        from gta6_agents.agents.live_campaign_ky4 import MANDATORY_PINNED_COMMENT
+
         mode_label = "DRY-RUN" if self.config.dry_run else "LIVE"
+        ch_label = str(plan.source.metadata.get("channel_handle") or plan.source.metadata.get("channel_name") or "").strip()
         lines = [
             f"🎬 Hook: {plan.hook_on_screen}",
-            f"📂 Pillar: {plan.pillar.value} | Source: {plan.source.creator_handle}",
+            f"📂 Canal: {ch_label or 'Matriz 5 Canais'} | Fonte: {plan.source.creator_handle}",
         ]
         for pub in publications:
             link_part = f" -> {pub.public_url}" if pub.public_url else ""
@@ -159,10 +172,14 @@ class RemoteNotifier:
                     f"🏆 Real Oficial ({entry.campaign_slug}): {entry.status} | {entry.youtube_url}"
                 )
 
+        if plan.for_real_oficial_campaign:
+            lines.append("✅ Checklist: Curtidas/comentários PÚBLICOS + NÃO arquivar/apagar por 48h!")
+
         return await self.send_alert(
-            title=f"✅ GTA 6 Clip Published ({mode_label})",
+            title=f"✅ Corte GTA VI Publicado ({mode_label})",
             lines=lines,
             level="success",
+            copy_code_block=MANDATORY_PINNED_COMMENT if plan.for_real_oficial_campaign else None,
         )
 
     async def notify_campaign_entry(
@@ -170,21 +187,25 @@ class RemoteNotifier:
         entry: ChampionshipEntry,
         pub: PublicationRecord | None = None,
     ) -> dict[str, bool]:
+        from gta6_agents.agents.live_campaign_ky4 import MANDATORY_PINNED_COMMENT
+
+        plat_name = pub.platform.value if pub else "tiktok/instagram_reels"
         lines = [
-            f"🏆 Campaign: {entry.campaign_slug}",
-            f"📺 YouTube Short: {entry.youtube_url}",
-            f"📊 Entry Status: {entry.status}",
-            f"💰 Est. CPM: R$ {entry.estimated_cpm_brl:.2f} / 1k views",
+            f"🏆 Campanha: {entry.campaign_slug} ({plat_name})",
+            f"📱 Link do Post: {entry.youtube_url}",
+            f"📊 Status no Painel: {entry.status}",
+            f"💰 Pagamento: R$ {entry.estimated_cpm_brl:.2f} / 1k views (>5k views, teto R$ 400)",
         ]
         if entry.notes:
-            lines.append(f"📝 Notes: {entry.notes}")
+            lines.append(f"📝 Ação: {entry.notes}")
         if pub and pub.id:
             lines.append(f"🔗 Publication ID: {pub.id}")
 
         return await self.send_alert(
-            title=f"🚀 Entered in Real Oficial ({entry.campaign_slug})",
+            title=f"🚀 Registrado na Real Oficial ({entry.campaign_slug})",
             lines=lines,
             level="campaign",
+            copy_code_block=MANDATORY_PINNED_COMMENT,
         )
 
     async def notify_pending_approval(
@@ -272,7 +293,7 @@ class RemoteNotifier:
         est_brl = round(
             sum(
                 (int(e.get("validated_views") or 0) / 1000.0)
-                * float(e.get("estimated_cpm_brl") or 1.25)
+                * float(e.get("estimated_cpm_brl") or 4.00)
                 for e in entries
             ),
             2,
