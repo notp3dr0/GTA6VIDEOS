@@ -17,9 +17,17 @@ capture_settings:
   clip_duration_sec: 25.0
   live_edge_capture_enabled: true
   dvr_rewind_from_live_edge_sec: 40.0
-  vod_hot_moments_offsets_sec: [180, 600, 1200, 2400, 3600]
-  auto_whisper_transcribe_ptbr: true   # Usa Groq Whisper (whisper-large-v3-turbo) ou OpenAI Whisper se houver chave no .env
-  strict_gta6_only_filter: true        # Ignora lives/vídeos de GTA 5 RP, CS2, Roblox, etc.
+  vod_intro_skip_sec: 180
+  vod_hot_moments_offsets_sec: [180, 420, 660, 960, 1320, 1800, 2400, 3000, 3600]
+  vod_rolling_step_sec: 240                 # Gera novos cortes inéditos a cada 4 min ao longo de VODs de 2h–10h
+  max_unseen_slices_per_vod_per_scan: 8     # Mantém os 5 canais (60 cortes/dia) abastecidos sempre pelos VODs mais novos
+  recency_priority_enabled: true            # Ordena SEMPRE pelos mais atuais: Live Ao Vivo (0m) -> VOD <3h -> VOD <12h -> VOD <24h
+  max_vod_age_hours: 72                     # Descarta VODs com mais de 72h (nunca posta conteúdo velho)
+  min_vod_upload_date: "2026-11-18"         # Descarta vídeos antigos anteriores à semana de lançamento
+  playlist_scan_depth: 5                    # Inspeciona os 5 itens mais recentes de /streams, /videos e Twitch archives
+  vod_radar_interval_minutes: 30            # Varredura automática a cada 30 min atrás de novos VODs recém-encerrados
+  auto_whisper_transcribe_ptbr: true        # Usa Groq Whisper (whisper-large-v3-turbo) ou OpenAI Whisper se houver chave no .env
+  strict_gta6_only_filter: true             # Ignora lives/vídeos de GTA 5 RP, CS2, Roblox, etc.
 
 streamers_br:
   - handle: "@SkorpionOFICIAL"

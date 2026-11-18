@@ -792,11 +792,101 @@ class ScoutAgent:
             return ContentPillar.COUNTDOWN_RECAP
         return ContentPillar.GAMEPLAY_CLIPS
 
-    async def _run_ytdlp_flat_json(self, feed_url: str, max_items: int = 3, timeout_sec: float = 8.0) -> list[dict[str, Any]]:
-        """Run yt-dlp --flat-playlist --dump-json on a Brazilian streamer YouTube/Twitch URL."""
+    @staticmethod
+    def _extract_entry_published_ts(entry: dict[str, Any]) -> tuple[float, str]:
+        """Extract exact or approximate upload/release timestamp (UTC epoch) and YYYY-MM-DD date from yt-dlp JSON."""
+        from datetime import datetime, timezone
+
+        for ts_key in ("release_timestamp", "timestamp"):
+            raw_ts = entry.get(ts_key)
+            if isinstance(raw_ts, (int, float)) and float(raw_ts) > 1_000_000_000:
+                ts_val = float(raw_ts)
+                dt_iso = datetime.fromtimestamp(ts_val, tz=timezone.utc).strftime("%Y-%m-%d")
+                return ts_val, dt_iso
+
+        for date_key in ("release_date", "upload_date"):
+            raw_d = str(entry.get(date_key) or "").strip()
+            if len(raw_d) == 8 and raw_d.isdigit():
+                try:
+                    dt = datetime.strptime(raw_d, "%Y%m%d").replace(tzinfo=timezone.utc)
+                    return dt.timestamp(), dt.strftime("%Y-%m-%d")
+                except ValueError:
+                    continue
+
+        return 0.0, ""
+
+    @staticmethod
+    def _compute_freshness_score(
+        *,
+        is_live: bool,
+        published_ts: float,
+        now_ts: float,
+        playlist_rank: int,
+    ) -> float:
+        """Return monotonic freshness score [0..100] so active lives and newest VODs ALWAYS rank first."""
+        if is_live:
+            return 100.0
+        if published_ts > 0.0:
+            age_hours = max(0.0, (now_ts - published_ts) / 3600.0)
+            return round(max(35.0, 99.0 - (age_hours * 1.1)), 2)
+        # Fallback to reverse-chronological tab position (0 = newest VOD on channel)
+        return round(max(40.0, 88.0 - (max(0, playlist_rank) * 12.0)), 2)
+
+    def _build_vod_unseen_offsets(
+        self,
+        canonical_url: str,
+        duration: float,
+        clip_dur: float,
+        capture_cfg: dict[str, Any],
+    ) -> list[float]:
+        """Generate unseen hot offsets + rolling 4-min slices across a fresh streamer VOD."""
+        intro_skip = float(capture_cfg.get("vod_intro_skip_sec", 180.0))
+        rolling_step = max(60.0, float(capture_cfg.get("vod_rolling_step_sec", 240.0)))
+        max_slices = max(1, int(capture_cfg.get("max_unseen_slices_per_vod_per_scan", 8)))
+        hot_offsets = [float(x) for x in (capture_cfg.get("vod_hot_moments_offsets_sec") or [180, 600, 1200])]
+
+        candidate_offsets: list[float] = []
+        seen_offs: set[int] = set()
+
+        for off in hot_offsets:
+            if duration <= 0.0 or (off + clip_dur + 5.0 <= duration):
+                key_i = int(off)
+                if key_i not in seen_offs:
+                    seen_offs.add(key_i)
+                    candidate_offsets.append(off)
+
+        if duration > intro_skip + clip_dur + 10.0:
+            cursor = intro_skip
+            # Cap rolling generation at 10 hours (36,000s)
+            hard_end = min(duration - clip_dur - 5.0, 36_000.0)
+            while cursor <= hard_end:
+                key_i = int(cursor)
+                if key_i not in seen_offs:
+                    seen_offs.add(key_i)
+                    candidate_offsets.append(cursor)
+                cursor += rolling_step
+
+        if not candidate_offsets:
+            fallback_off = max(0.0, min(30.0, duration * 0.2)) if duration > clip_dur else 0.0
+            candidate_offsets = [fallback_off]
+
+        unseen: list[float] = []
+        for off_sec in candidate_offsets:
+            end_sec = off_sec + clip_dur
+            seg_url = f"{canonical_url}#{int(off_sec)}-{int(end_sec)}"
+            if not self.store.is_source_seen(seg_url):
+                unseen.append(off_sec)
+            if len(unseen) >= max_slices:
+                break
+        return unseen
+
+    async def _run_ytdlp_flat_json(self, feed_url: str, max_items: int = 5, timeout_sec: float = 9.0) -> list[dict[str, Any]]:
+        """Run yt-dlp --flat-playlist --dump-json (with YouTube approximate_date) on a BR streamer URL."""
         cmd = [
             *_resolve_ytdlp_cmd(),
             "--flat-playlist",
+            "--extractor-args",
+            "youtubetab:approximate_date",
             "--dump-json",
             "--playlist-end",
             str(max(1, max_items)),
@@ -843,7 +933,7 @@ class ScoutAgent:
         blacklist: set[str],
         blocked_keywords: list[str],
     ) -> list[SourceCandidate]:
-        """Extract GTA VI live streams or VOD segments from one Brazilian streamer's YouTube/Twitch feed."""
+        """Extract the newest GTA VI live streams & VOD slices from one Brazilian streamer's YouTube/Twitch feed."""
         if not feed_url:
             return []
 
@@ -852,16 +942,20 @@ class ScoutAgent:
         priority_score = float(streamer.get("priority", 90.0))
         clip_dur = float(capture_cfg.get("clip_duration_sec", 25.0))
         strict_gta6 = bool(capture_cfg.get("strict_gta6_only_filter", True))
-        vod_offsets = capture_cfg.get("vod_hot_moments_offsets_sec") or [180, 600, 1200]
+        max_vod_age_hours = float(capture_cfg.get("max_vod_age_hours", 72.0))
+        min_vod_date = str(capture_cfg.get("min_vod_upload_date") or "").strip()
+        scan_depth = max(1, int(capture_cfg.get("playlist_scan_depth", 5)))
 
-        raw_entries = await self._run_ytdlp_flat_json(feed_url, max_items=3)
+        raw_entries = await self._run_ytdlp_flat_json(feed_url, max_items=scan_depth)
         results: list[SourceCandidate] = []
 
         from datetime import datetime, timezone
 
-        live_bucket = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")[:-1] + "0"  # 10-min rolling live window
+        now_dt = datetime.now(timezone.utc)
+        now_ts = now_dt.timestamp()
+        live_bucket = now_dt.strftime("%Y%m%d%H%M")[:-1] + "0"  # 10-min rolling live window
 
-        for entry in raw_entries:
+        for playlist_rank, entry in enumerate(raw_entries):
             raw_title = str(entry.get("title") or "").strip()
             raw_desc = str(entry.get("description") or "").strip()
             if not raw_title:
@@ -869,7 +963,7 @@ class ScoutAgent:
 
             title = sanitize_untrusted_video_text(raw_title, max_length=160)
             summary = sanitize_untrusted_video_text(
-                raw_desc or f"Corte de live/gameplay de {streamer_name} ({handle}) jogando GTA VI em português.",
+                raw_desc or f"Corte recente de live/VOD de {streamer_name} ({handle}) jogando GTA VI em português.",
                 max_length=360,
             )
             combined = f"{title} {summary}"
@@ -881,6 +975,35 @@ class ScoutAgent:
                 continue
             if self._is_blocked_content(handle, title, summary, blacklist, blocked_keywords):
                 continue
+
+            entry_is_live = (
+                is_live_endpoint
+                or bool(entry.get("is_live", False))
+                or str(entry.get("live_status") or "") == "is_live"
+            )
+            published_ts, upload_date_iso = self._extract_entry_published_ts(entry)
+
+            # Enforce recency & post-launch filters on VODs so old videos never get clipped
+            if not entry_is_live:
+                if min_vod_date and upload_date_iso and upload_date_iso < min_vod_date:
+                    continue
+                if max_vod_age_hours > 0.0 and published_ts > 0.0:
+                    age_hours = max(0.0, (now_ts - published_ts) / 3600.0)
+                    if age_hours > max_vod_age_hours:
+                        continue
+                else:
+                    age_hours = -1.0
+            else:
+                published_ts = now_ts
+                upload_date_iso = now_dt.strftime("%Y-%m-%d")
+                age_hours = 0.0
+
+            freshness_score = self._compute_freshness_score(
+                is_live=entry_is_live,
+                published_ts=published_ts if not entry_is_live else now_ts,
+                now_ts=now_ts,
+                playlist_rank=playlist_rank,
+            )
 
             webpage_url = str(entry.get("webpage_url") or entry.get("url") or "").strip()
             vid_id = str(entry.get("id") or "").strip()
@@ -898,21 +1021,17 @@ class ScoutAgent:
                 canonical_url = feed_url
 
             platform_type = "twitch" if "twitch.tv" in canonical_url.lower() else "youtube"
-            entry_is_live = (
-                is_live_endpoint
-                or bool(entry.get("is_live", False))
-                or str(entry.get("live_status") or "") == "is_live"
-            )
             duration = float(entry.get("duration") or 0.0)
 
+            recency_bonus = min(8.0, freshness_score / 12.5)
             score = self._score_candidate(
-                base_score=min(95.0, max(80.0, priority_score * 0.92)),
+                base_score=min(95.0, max(80.0, priority_score * 0.90)),
                 title=title,
                 summary=summary,
                 is_official=False,
                 is_campaign_acervo=False,
                 is_whitelisted=True,
-                engagement_bonus=4.0 if entry_is_live else 2.0,
+                engagement_bonus=recency_bonus,
             )
 
             if entry_is_live:
@@ -942,37 +1061,74 @@ class ScoutAgent:
                             "streamer_br": True,
                             "streamer_name": streamer_name,
                             "platform": platform_type,
+                            "published_ts": published_ts,
+                            "upload_date": upload_date_iso,
+                            "age_hours": 0.0,
+                            "playlist_rank": playlist_rank,
+                            "freshness_score": freshness_score,
                         },
                     )
                 )
             else:
-                valid_offsets: list[float] = []
-                for raw_off in vod_offsets:
-                    off = float(raw_off)
-                    if duration <= 0.0 or (off + clip_dur + 5.0 <= duration):
-                        valid_offsets.append(off)
-                    if len(valid_offsets) >= 2:
-                        break
-                if not valid_offsets:
-                    valid_offsets = [max(0.0, min(30.0, duration * 0.2))] if duration > clip_dur else [0.0]
-
-                for off_sec in valid_offsets:
+                unseen_offsets = self._build_vod_unseen_offsets(
+                    canonical_url=canonical_url,
+                    duration=duration,
+                    clip_dur=clip_dur,
+                    capture_cfg=capture_cfg,
+                )
+                slice_angles_pt = [
+                    (
+                        "Primeira reação ao vivo",
+                        f"Reação imediata de {streamer_name} logo nos primeiros minutos explorando Vice City em GTA VI",
+                    ),
+                    (
+                        "Fuga e adrenalina em Leonida",
+                        f"Perseguição intensa e física de direção comentada por {streamer_name} nas avenidas de Leonida",
+                    ),
+                    (
+                        "Detalhe escondido descoberto na live",
+                        f"Momento em que o chat de {streamer_name} aponta interações inéditas de NPCs e clima dinâmico",
+                    ),
+                    (
+                        "Clutch insano na missão",
+                        f"Jogada decisiva com troca de ação rápida durante a transmissão mais recente de {streamer_name}",
+                    ),
+                    (
+                        "Resenha e caos em Vice Beach",
+                        f"Trecho hilário da gameplay de {streamer_name} testando os limites do mapa aberto de GTA VI",
+                    ),
+                    (
+                        "Exploração noturna em alta velocidade",
+                        f"Travessia noturna sob luzes neon mostrada ao vivo no VOD recém-publicado por {streamer_name}",
+                    ),
+                    (
+                        "Teste de veículos e destruição",
+                        f"Análise prática da deformação veicular e som dos motores na live de {streamer_name}",
+                    ),
+                    (
+                        "Momento épico nos pântanos de Grassrivers",
+                        f"Descoberta inesperada de vida selvagem e rotas secretas no corte recente de {streamer_name}",
+                    ),
+                ]
+                for slice_idx, off_sec in enumerate(unseen_offsets):
                     end_sec = off_sec + clip_dur
                     seg_url = f"{canonical_url}#{int(off_sec)}-{int(end_sec)}"
-                    if self.store.is_source_seen(seg_url):
-                        continue
+                    mm_ss = f"{int(off_sec) // 60:02d}m{int(off_sec) % 60:02d}s"
+                    angle_title, angle_fact = slice_angles_pt[slice_idx % len(slice_angles_pt)]
+                    # Slight decay by slice_idx so 1 slice of each newest VOD rotates before taking slice #2
+                    slice_freshness = round(max(1.0, freshness_score - (slice_idx * 0.35)), 2)
                     results.append(
                         SourceCandidate(
-                            title=f"{streamer_name} — {title}"[:160],
+                            title=f"{streamer_name} [{mm_ss}] {angle_title} — {title}"[:160],
                             url=seg_url,
                             creator_handle=handle,
                             source_type=platform_type,
                             is_official=False,
                             is_campaign_acervo=False,
                             pillar=ContentPillar.GAMEPLAY_CLIPS,
-                            summary=summary,
+                            summary=f"{angle_fact} (trecho {mm_ss}). {summary}"[:360],
                             verified_facts=[
-                                f"Corte de live/VOD em português do streamer brasileiro {streamer_name} ({handle}).",
+                                f"{angle_fact} (minuto {mm_ss} do VOD mais atual de {handle}).",
                             ],
                             suggested_start_sec=off_sec,
                             suggested_end_sec=end_sec,
@@ -984,6 +1140,12 @@ class ScoutAgent:
                                 "streamer_br": True,
                                 "streamer_name": streamer_name,
                                 "platform": platform_type,
+                                "published_ts": published_ts,
+                                "upload_date": upload_date_iso,
+                                "age_hours": round(age_hours, 2) if age_hours >= 0 else None,
+                                "playlist_rank": playlist_rank,
+                                "slice_index": slice_idx,
+                                "freshness_score": slice_freshness,
                             },
                         )
                     )
@@ -994,9 +1156,9 @@ class ScoutAgent:
         self,
         blacklist: set[str],
         blocked_keywords: list[str],
-        max_streamers: int = 8,
+        max_streamers: int = 10,
     ) -> list[SourceCandidate]:
-        """Discover active GTA VI lives & recent VODs from top Brazilian streamers (YouTube + Twitch)."""
+        """Discover active GTA VI lives & newest VODs across all configured Brazilian streamers (YouTube + Twitch)."""
         capture_cfg, streamers = self._load_streamers_br_config()
         if not streamers:
             return []
@@ -1032,7 +1194,85 @@ class ScoutAgent:
         for batch in batches:
             if isinstance(batch, list):
                 discovered.extend(batch)
+
+        # Sort strictly by newest live / newest VOD first!
+        discovered.sort(
+            key=lambda c: (
+                float(c.metadata.get("freshness_score", 0.0)),
+                float(c.metadata.get("published_ts", 0.0)),
+                c.virality_score,
+            ),
+            reverse=True,
+        )
         return discovered
+
+    async def refresh_fresh_vods_radar(self) -> dict[str, Any]:
+        """Background 30-min radar scan that indexes the newest Brazilian streamer GTA VI VODs & lives."""
+        from datetime import datetime, timezone
+
+        _, blacklist, blocked_keywords = self._load_creator_lists()
+        fresh_candidates = await self.discover_br_streamer_streams(
+            blacklist=blacklist,
+            blocked_keywords=blocked_keywords,
+            max_streamers=10,
+        )
+
+        # Cache up to 40 newest unseen VOD/live slices on disk + SQLite flag for instant slot access
+        cache_path = self.config.data_dir / "fresh_br_vods_cache.json"
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        serialized = [c.model_dump(mode="json") for c in fresh_candidates[:40]]
+        payload = {
+            "scanned_at": datetime.now(timezone.utc).isoformat(),
+            "total_unseen_slices": len(fresh_candidates),
+            "top_vods_preview": [
+                {
+                    "title": c.title,
+                    "creator": c.creator_handle,
+                    "url": c.metadata.get("canonical_url", c.url),
+                    "is_live": bool(c.metadata.get("is_live", False)),
+                    "freshness_score": c.metadata.get("freshness_score", 0.0),
+                    "upload_date": c.metadata.get("upload_date", ""),
+                }
+                for c in fresh_candidates[:10]
+            ],
+            "candidates": serialized,
+        }
+        try:
+            cache_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            self.store.set_flag(
+                "latest_br_vod_radar_json",
+                json.dumps(
+                    {
+                        "scanned_at": payload["scanned_at"],
+                        "total_unseen_slices": payload["total_unseen_slices"],
+                        "top_vods_preview": payload["top_vods_preview"][:5],
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+        except Exception:
+            pass
+        return payload
+
+    def _load_cached_fresh_vods(self, blacklist: set[str], blocked_keywords: list[str]) -> list[SourceCandidate]:
+        """Load recently scanned Brazilian streamer VOD slices from `data/fresh_br_vods_cache.json` if unseen."""
+        cache_path = self.config.data_dir / "fresh_br_vods_cache.json"
+        if not cache_path.exists():
+            return []
+        try:
+            raw = json.loads(cache_path.read_text(encoding="utf-8"))
+            items = raw.get("candidates", []) if isinstance(raw, dict) else []
+            restored: list[SourceCandidate] = []
+            for item in items:
+                cand = SourceCandidate.model_validate(item)
+                if self.store.is_source_seen(cand.url):
+                    continue
+                if self._is_blocked_content(cand.creator_handle, cand.title, cand.summary, blacklist, blocked_keywords):
+                    continue
+                restored.append(cand)
+            return restored
+        except Exception:
+            return []
 
     def _curated_offline_fallbacks(
         self, blacklist: set[str], blocked_keywords: list[str]
@@ -1187,11 +1427,13 @@ class ScoutAgent:
         limit: int = 10,
         include_campaign_acervo: bool = True,
     ) -> list[SourceCandidate]:
-        """Discover, sanitize, filter, deduplicate, and rank GTA 6 clip candidates."""
+        """Discover, sanitize, filter, deduplicate, and rank GTA 6 clip candidates (newest VODs/lives first)."""
         if limit <= 0:
             return []
 
         whitelist, blacklist, blocked_keywords = self._load_creator_lists()
+        capture_cfg, _ = self._load_streamers_br_config()
+        recency_first = bool(capture_cfg.get("recency_priority_enabled", True))
         collected: list[SourceCandidate] = []
         seen_batch_urls: set[str] = set()
 
@@ -1209,7 +1451,7 @@ class ScoutAgent:
             and campaign_block.get("rules", {}).get("only_authorized_live_source", False)
         )
 
-        # 1. Campaign Acervo multi-segment candidates (KY4DWumZffg live stream)
+        # 1. Campaign Acervo multi-segment candidates (KY4DWumZffg live stream while ON AIR)
         if include_campaign_acervo:
             acervo_candidates = self._discover_campaign_acervo(
                 blacklist,
@@ -1225,12 +1467,15 @@ class ScoutAgent:
                 )
                 return collected[:limit]
 
-        # 2. Brazilian Streamer Lives & VODs (YouTube + Twitch via yt-dlp) + YouTube RSS
+        # 2. Post-Live / Streamer Mode: Brazilian Streamer Lives & Newest VODs (YouTube + Twitch via yt-dlp)
         scout_cfg = (self.config.settings or {}).get("scout", {})
         offline_only = bool(scout_cfg.get("offline_only", False)) if isinstance(scout_cfg, dict) else False
         enable_ytdlp_in_dry = (
             bool(scout_cfg.get("enable_ytdlp_in_dry_run", False)) if isinstance(scout_cfg, dict) else False
         )
+
+        # Include any fresh unseen VODs cached by the 30-min background radar
+        _add_unique(self._load_cached_fresh_vods(blacklist, blocked_keywords))
 
         if not offline_only:
             if not self.config.dry_run or enable_ytdlp_in_dry:
@@ -1266,10 +1511,22 @@ class ScoutAgent:
             fallback_candidates = self._curated_offline_fallbacks(blacklist, blocked_keywords)
             _add_unique(fallback_candidates)
 
-        collected.sort(
-            key=lambda c: (c.virality_score, c.is_campaign_acervo, c.is_official),
-            reverse=True,
-        )
+        if recency_first:
+            collected.sort(
+                key=lambda c: (
+                    c.is_campaign_acervo,
+                    float(c.metadata.get("freshness_score", 0.0)),
+                    float(c.metadata.get("published_ts", 0.0)),
+                    c.virality_score,
+                    c.is_official,
+                ),
+                reverse=True,
+            )
+        else:
+            collected.sort(
+                key=lambda c: (c.virality_score, c.is_campaign_acervo, c.is_official),
+                reverse=True,
+            )
         return collected[:limit]
 
     async def _gather_live_feeds(

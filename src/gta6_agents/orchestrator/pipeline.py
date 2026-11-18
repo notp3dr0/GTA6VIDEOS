@@ -317,6 +317,7 @@ class MultiAgentOrchestrator:
         max_items: int = 4,
         include_campaign: bool = True,
         demo_video_fallback: bool = False,
+        channel_id: str = "",
     ) -> dict[str, Any]:
         """Run a full multi-agent discovery, verification, 9:16 rendering, publishing, and learning cycle."""
         self.store.set_flag("last_heartbeat_at", utc_now().isoformat())
@@ -345,9 +346,18 @@ class MultiAgentOrchestrator:
 
         approved_items = await self._process_approved_queue(demo_video_fallback=demo_video_fallback)
 
+        active_mc_channel = ""
+        if channel_id and self.multi_channel is not None:
+            try:
+                self.multi_channel.get_channel(channel_id)
+                active_mc_channel = channel_id
+            except ValueError:
+                active_mc_channel = ""
+
+        discover_limit = max(max_items * 6, 8) if active_mc_channel else max_items
         try:
             candidates = await self.scout.discover_candidates(
-                limit=max_items,
+                limit=discover_limit,
                 include_campaign_acervo=include_campaign,
             )
         except Exception as exc:
@@ -355,7 +365,35 @@ class MultiAgentOrchestrator:
             await self.notifier.notify_error("ScoutAgent.discover_candidates", exc)
             candidates = []
 
-        selected_candidates = list(candidates)[: max(0, max_items)]
+        selected_candidates: list[SourceCandidate] = []
+        if active_mc_channel and self.multi_channel is not None:
+            today_str = self.multi_channel._today_brt_str()
+            for cand in candidates:
+                if len(selected_candidates) >= max(0, max_items):
+                    break
+                canonical = str(cand.metadata.get("canonical_url") or cand.url.split("#", 1)[0])
+                end_sec = max(cand.suggested_start_sec + 1.0, cand.suggested_end_sec)
+                claimed, adj_start, adj_end = self.multi_channel.claim_unique_segment(
+                    channel_id=active_mc_channel,
+                    source_url=canonical,
+                    start_sec=cand.suggested_start_sec,
+                    end_sec=end_sec,
+                    date_str=today_str,
+                )
+                if claimed:
+                    updated_meta = dict(cand.metadata)
+                    updated_meta["target_channel_id"] = active_mc_channel
+                    selected_candidates.append(
+                        cand.model_copy(
+                            update={
+                                "suggested_start_sec": adj_start,
+                                "suggested_end_sec": adj_end,
+                                "metadata": updated_meta,
+                            }
+                        )
+                    )
+        else:
+            selected_candidates = list(candidates)[: max(0, max_items)]
 
         worker_results = await asyncio.gather(
             *(

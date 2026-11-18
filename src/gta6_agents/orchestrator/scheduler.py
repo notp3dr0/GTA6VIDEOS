@@ -127,7 +127,7 @@ class DailyScheduler:
     async def _run_short_slot(self, slot_time: str, channel_id: str = "") -> None:
         label = f"{channel_id}@{slot_time}" if channel_id else slot_time
         logger.info(
-            "Executing scheduled Live Cut slot (%s %s)...",
+            "Executing scheduled Live/VOD Cut slot (%s %s)...",
             label,
             self.config.timezone,
         )
@@ -136,10 +136,27 @@ class DailyScheduler:
                 max_items=1,
                 include_campaign=True,
                 demo_video_fallback=self.config.dry_run,
+                channel_id=channel_id,
             )
         except Exception as exc:
             logger.exception("Scheduled slot (%s) failed: %s", label, exc)
             await self.orchestrator.notifier.notify_error(f"Scheduled slot {label}", exc)
+
+    async def _run_fresh_vod_radar(self) -> None:
+        """Every 30m, scan YouTube & Twitch for newly finished VODs and active lives of BR streamers."""
+        if self.config.dry_run:
+            return
+        refresh_fn = getattr(self.orchestrator.scout, "refresh_fresh_vods_radar", None)
+        if refresh_fn is None:
+            return
+        try:
+            radar_res = await refresh_fn()
+            logger.info(
+                "Fresh BR VOD Radar: %d unseen slices ready across newest streamer VODs/lives.",
+                int(radar_res.get("total_unseen_slices", 0)),
+            )
+        except Exception as exc:
+            logger.debug("Fresh BR VOD Radar warning: %s", exc)
 
     async def _run_tri_engine_recovery(self) -> None:
         """Every 15m, probe/clear expired 5h AI rate-limit cooldowns & log resumable checkpoints."""
@@ -189,7 +206,7 @@ class DailyScheduler:
             await self.orchestrator.notifier.notify_error("Scheduled Analytics Learning Loop", exc)
 
     def configure_jobs(self) -> list[dict[str, Any]]:
-        """Register all 60 daily 5-channel slots, Skorpion turbo burst, Telegram poll, and 5h AI recovery."""
+        """Register all 60 daily 5-channel slots, Skorpion turbo burst, 30m Fresh VOD radar, Telegram poll, and 5h AI recovery."""
         mc = getattr(self.orchestrator, "multi_channel", None)
         scheduled_60 = False
         if mc is not None:
@@ -205,7 +222,7 @@ class DailyScheduler:
                         trigger=CronTrigger(hour=hour, minute=minute, timezone=self.tz),
                         args=[slot_str, ch_id],
                         id=job_id,
-                        name=f"[{ch_id}] Live Cut ({slot_str} {self.config.timezone})",
+                        name=f"[{ch_id}] Live/VOD Cut ({slot_str} {self.config.timezone})",
                         replace_existing=True,
                     )
                 scheduled_60 = bool(daily_60)
@@ -249,7 +266,16 @@ class DailyScheduler:
                 replace_existing=True,
             )
 
-        # 3. Mobile Telegram command polling every 60 seconds
+        # 3. Continuous Fresh Brazilian VOD & Live Radar every 30 minutes (post-live & multi-day hunting)
+        self.scheduler.add_job(
+            self._run_fresh_vod_radar,
+            trigger=IntervalTrigger(minutes=30, timezone=self.tz),
+            id="br_fresh_vod_radar_30m",
+            name="Fresh BR Streamer VOD & Live Radar (30m)",
+            replace_existing=True,
+        )
+
+        # 4. Mobile Telegram command polling every 60 seconds
         self.scheduler.add_job(
             self._run_telegram_poll,
             trigger=IntervalTrigger(seconds=60, timezone=self.tz),
@@ -258,7 +284,7 @@ class DailyScheduler:
             replace_existing=True,
         )
 
-        # 4. Tri-Engine 5-Hour Limit Recovery & Checkpoint Resume every 15 minutes
+        # 5. Tri-Engine 5-Hour Limit Recovery & Checkpoint Resume every 15 minutes
         self.scheduler.add_job(
             self._run_tri_engine_recovery,
             trigger=IntervalTrigger(minutes=15, timezone=self.tz),
@@ -267,7 +293,7 @@ class DailyScheduler:
             replace_existing=True,
         )
 
-        # 5. Self-improving Analytics Learning Loop every 6 hours
+        # 6. Self-improving Analytics Learning Loop every 6 hours
         self.scheduler.add_job(
             self._run_learning_loop,
             trigger=IntervalTrigger(hours=6, timezone=self.tz),

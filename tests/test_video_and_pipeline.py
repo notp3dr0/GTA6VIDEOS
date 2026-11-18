@@ -336,3 +336,104 @@ async def test_scout_discovers_brazilian_streamers_and_blocks_gta5_rp(
     assert found[0].creator_handle == "@PaulinhoLOKOoficial"
     assert found[0].source_type == "twitch"
 
+
+@pytest.mark.asyncio
+async def test_post_live_handoff_prioritizes_newest_br_vods_rejects_old_vods_and_rotates_slices(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import datetime, timezone
+
+    from gta6_agents.orchestrator.scheduler import DailyScheduler
+
+    base_cfg = _make_pipeline_test_config(tmp_path)
+    updated_settings = dict(base_cfg.settings)
+    updated_settings["scout"] = {"enable_ytdlp_in_dry_run": True}
+    cfg = base_cfg.model_copy(update={"settings": updated_settings})
+
+    store = StateStore(cfg.data_dir, cfg.memory_dir)
+    orchestrator = MultiAgentOrchestrator(cfg, store)
+
+    # Simulate post-live state: KY4DWumZffg 25h live has ended -> campaign acervo is blocked
+    monkeypatch.setattr(orchestrator.scout, "_is_campaign_blocked_now", lambda _block: True)
+
+    now_ts = datetime.now(timezone.utc).timestamp()
+
+    async def _fake_ytdlp_vods(feed_url: str, max_items: int = 5, timeout_sec: float = 9.0):
+        # Skorpion (priority 100) has a 22-hour-old VOD + a stale 5-day-old VOD
+        if "@SkorpionOFICIAL/streams" in feed_url:
+            return [
+                {
+                    "id": "skorp_vod_22h",
+                    "title": "ZERANDO GTA 6 EM VICE CITY! MISSÕES COM JASON E LUCIA",
+                    "description": "VOD completo jogando GTA VI",
+                    "webpage_url": "https://www.youtube.com/watch?v=skorpVOD22h",
+                    "is_live": False,
+                    "duration": 7200,
+                    "timestamp": now_ts - (22 * 3600),
+                },
+                {
+                    "id": "skorp_vod_old_120h",
+                    "title": "AQUECIMENTO GTA 6 ANALISANDO LEONIDA",
+                    "description": "Vídeo antigo de 5 dias atrás",
+                    "webpage_url": "https://www.youtube.com/watch?v=skorpOld120",
+                    "is_live": False,
+                    "duration": 3600,
+                    "timestamp": now_ts - (120 * 3600),
+                },
+            ]
+        # Alanzoka (priority 96) JUST finished a brand-new VOD 25 minutes ago!
+        if "twitch.tv/alanzoka/videos" in feed_url:
+            return [
+                {
+                    "id": "v99887766",
+                    "title": "ALANZOKA JOGANDO GTA 6 PELA PRIMEIRA VEZ EM LEONIDA!",
+                    "description": "VOD fresquinho da live na Twitch",
+                    "webpage_url": "https://www.twitch.tv/videos/99887766",
+                    "is_live": False,
+                    "duration": 10800,
+                    "timestamp": now_ts - (25 * 60),
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(orchestrator.scout, "_run_ytdlp_flat_json", _fake_ytdlp_vods)
+
+    # 1. Verify 30-min radar indexes fresh VODs, discards >72h VOD, and puts 25-min-old Alanzoka VOD #1
+    radar = await orchestrator.scout.refresh_fresh_vods_radar()
+    assert radar["total_unseen_slices"] >= 8
+    all_urls = [c["url"] for c in radar["candidates"]]
+    assert not any("skorpOld120" in u for u in all_urls), "Stale >72h VOD must be rejected"
+    assert not any("KY4DWumZffg" in u for u in all_urls), "Ended KY4DWumZffg live must not appear post-live"
+
+    discovered = await orchestrator.scout.discover_candidates(limit=10, include_campaign_acervo=True)
+    assert len(discovered) >= 4
+    # Alanzoka's 25-min-old VOD MUST beat Skorpion's 22-hour-old VOD despite lower channel priority!
+    assert discovered[0].creator_handle == "@alanzoka"
+    assert "99887766" in discovered[0].url
+
+    # 2. Verify two different channels (ch1 and ch2) claim non-overlapping slices of the newest VOD
+    res_ch1 = await orchestrator.run_daily_cycle(
+        max_items=1,
+        include_campaign=True,
+        demo_video_fallback=True,
+        channel_id="ch1_plantao_oficial",
+    )
+    res_ch2 = await orchestrator.run_daily_cycle(
+        max_items=1,
+        include_campaign=True,
+        demo_video_fallback=True,
+        channel_id="ch2_leonida_segredos",
+    )
+    assert res_ch1["rendered"] == 1
+    assert res_ch2["rendered"] == 1
+    assert res_ch1["championship_entries"] == 0  # Post-live: zero Real Oficial submissions!
+    assert res_ch2["championship_entries"] == 0
+
+    # 3. Verify DailyScheduler registers the 30-minute Fresh BR VOD Radar job
+    sched = DailyScheduler(cfg, orchestrator=orchestrator, store=store)
+    jobs = sched.configure_jobs()
+    job_ids = {j["id"] for j in jobs}
+    assert "br_fresh_vod_radar_30m" in job_ids
+
+
