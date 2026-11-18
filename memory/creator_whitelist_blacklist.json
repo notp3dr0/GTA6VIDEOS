@@ -1,62 +1,116 @@
 {
-  "version": "1.0.0",
-  "updated_at": "2026-11-18T00:00:00Z",
+  "version": "2.0.0",
+  "updated_at": "2026-11-18T18:35:00Z",
   "policy": {
     "default_unknown_creator": "allow_with_credit_and_transformation",
     "require_credit_tag": true,
     "credit_format": "🎥 @{handle}",
     "never_repost_leaks_or_datamines": true,
     "never_crop_out_hud_deceptively": true,
-    "respect_no_repost_bios": true
+    "respect_no_repost_bios": true,
+    "brazilian_streamers_only_post_live": true
   },
   "whitelist": [
     {
-      "handle": "@RockstarGames",
-      "name": "Rockstar Games",
-      "youtube_channel_id": "UC6VcWc1rAoWdBCM0JxrRQ3A",
-      "platforms": ["youtube", "x", "official_newswire"],
+      "handle": "@YouTube",
+      "name": "Live Oficial YouTube x GTA VI (KY4DWumZffg)",
+      "platforms": ["youtube_live"],
       "is_official": true,
-      "permission_basis": "official_press_and_campaign_acervo",
-      "notes": "Official Rockstar Games trailers, Leonida regional spotlights, and Newswire announcements."
+      "permission_basis": "real_oficial_campaign_acervo",
+      "notes": "Única fonte válida durante as 25h da campanha Real Oficial (KY4DWumZffg)."
     },
     {
-      "handle": "@GTASeriesVideos",
-      "name": "GTA Series Videos",
-      "youtube_channel_id": "UCuWcjpKbIDAbZfHoru1toFg",
-      "platforms": ["youtube", "x"],
+      "handle": "@SkorpionOFICIAL",
+      "name": "Skorpion Gamer",
+      "platforms": ["youtube_live", "youtube"],
       "is_official": false,
       "permission_basis": "public_credited_transformed",
-      "notes": "High-accuracy GTA guides, trailer breakdowns, hidden details, and franchise comparisons."
+      "notes": "Convidado oficial BR na live YouTube x GTA VI (07:04-08:10 e 22:30-22:57 BRT) e lives PT-BR de GTA VI."
     },
     {
-      "handle": "@TGGonYT",
-      "name": "TGG",
-      "youtube_channel_id": "UCD23kK2Q4P3H9G5xN4vL2wA",
-      "platforms": ["youtube", "x"],
+      "handle": "@GamerCosta",
+      "name": "Gamer Costa",
+      "platforms": ["youtube_live", "youtube"],
       "is_official": false,
       "permission_basis": "public_credited_transformed",
-      "notes": "Verified GTA news recaps, GTA Online preparation guides, and gameplay commentary."
+      "notes": "Convidado oficial BR no Passaporte pra Vice City (07:04-08:10 BRT) e lives PT-BR de GTA VI."
     },
     {
-      "handle": "@DarkViperAU",
-      "name": "DarkViperAU",
-      "youtube_channel_id": "UCV6mNrW8CrmWtcxWfQXy11g",
-      "platforms": ["youtube", "x"],
+      "handle": "@PaulinhoLOKOoficial",
+      "name": "Paulinho o Loko",
+      "platforms": ["twitch", "youtube_live"],
       "is_official": false,
       "permission_basis": "public_credited_transformed",
-      "notes": "GTA V mechanics, speedrun facts, AI behavior trivia, and physics details."
+      "notes": "Maior streamer brasileiro de GTA — lives na Twitch (paulinholokobr) e YouTube."
     },
     {
-      "handle": "@Broughy1322",
-      "name": "Broughy1322",
-      "youtube_channel_id": "UCcZ3sRk9z6jjgfYQbMGTpig",
-      "platforms": ["youtube"],
+      "handle": "@alanzoka",
+      "name": "Alanzoka",
+      "platforms": ["twitch", "youtube_live"],
       "is_official": false,
       "permission_basis": "public_credited_transformed",
-      "notes": "GTA vehicle class testing, braking/handling physics, and lap-time benchmarks."
+      "notes": "Lives completas de lançamento de GTA VI em PT-BR na Twitch e YouTube."
+    },
+    {
+      "handle": "@loud_coringa",
+      "name": "LOUD Coringa",
+      "platforms": ["twitch", "youtube_live"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "Lives de GTA VI em PT-BR na Twitch (loud_coringa) e YouTube."
+    },
+    {
+      "handle": "@funkyblackcat",
+      "name": "FunkyBlackCat",
+      "platforms": ["youtube_live", "twitch"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "Gameplay e análise técnica ao vivo em PT-BR de GTA VI."
+    },
+    {
+      "handle": "@gaules",
+      "name": "Gaules",
+      "platforms": ["twitch", "youtube_live"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "Reações ao vivo da Tribo em PT-BR no lançamento de GTA VI."
+    },
+    {
+      "handle": "@luquet4",
+      "name": "Luquet4",
+      "platforms": ["twitch", "youtube_live"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "Lives brasileiras de GTA VI na Twitch e YouTube."
+    },
+    {
+      "handle": "@BRKsEDU",
+      "name": "BRKsEDU",
+      "platforms": ["youtube_live", "twitch"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "Cobertura e gameplay ao vivo em PT-BR de GTA VI."
+    },
+    {
+      "handle": "@Gameplayrj",
+      "name": "Davy Jones (Gameplayrj)",
+      "platforms": ["youtube_live", "youtube"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "Lives e gameplay de GTA VI em PT-BR."
     }
   ],
   "blacklist": [
+    {
+      "handle": "@SamiraClose",
+      "reason": "PROIBIDA na campanha Real Oficial (não autorizou cortes em nenhum segundo).",
+      "added_at": "2026-11-18"
+    },
+    {
+      "handle": "@TheBurntPeanut",
+      "reason": "PROIBIDO na campanha Real Oficial (não autorizou cortes — janela 20:03-20:30 BRT bloqueada).",
+      "added_at": "2026-11-18"
+    },
     {
       "handle": "@GTA6LeaksHub",
       "reason": "Distributes stolen pre-release dev-build footage subject to DMCA strikes.",
@@ -79,6 +133,11 @@
     }
   ],
   "blocked_keywords": [
+    "samira close",
+    "the burnt peanut",
+    "burnt peanut",
+    "antes do gta 6",
+    "before gta 6",
     "leaked build",
     "dev build",
     "source code leak",

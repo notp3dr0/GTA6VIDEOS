@@ -1,0 +1,113 @@
+# ==============================================================================
+# RADAR DE STREAMERS BRASILEIROS (LIVES & VODS DE GTA VI — YOUTUBE + TWITCH)
+# ==============================================================================
+# FASE 1 (19/11 01:00 BRT -> 20/11 01:57 BRT — Campanha Real Oficial):
+#   - Fonte ÚNICA permitida na campanha: https://www.youtube.com/watch?v=KY4DWumZffg
+#   - Foco BR dentro da live oficial: Skorpion & Gamer Costa (07:04-08:10 s/ Samira Close)
+#     e Gameplay PT-BR do Skorpion (22:30-22:57 BRT, Turbo 3x) + cortes dublados/legendados PT-BR.
+#
+# FASE 2 (A partir de 20/11 02:00 BRT — Pós-Live / Dias 2 a 5 fora de casa):
+#   - O ScoutAgent varre automaticamente via `yt-dlp` as lives ativas (`/live` e Twitch)
+#     e os VODs/transmissões recentes (`/streams` e `videos?filter=archives`) APENAS
+#     destes streamers brasileiros jogando GTA VI!
+#   - Bloqueio automático de vídeos de GTA 5 RP, Roblox ou outros jogos.
+# ==============================================================================
+
+capture_settings:
+  clip_duration_sec: 25.0
+  live_edge_capture_enabled: true
+  dvr_rewind_from_live_edge_sec: 40.0
+  vod_hot_moments_offsets_sec: [180, 600, 1200, 2400, 3600]
+  auto_whisper_transcribe_ptbr: true   # Usa Groq Whisper (whisper-large-v3-turbo) ou OpenAI Whisper se houver chave no .env
+  strict_gta6_only_filter: true        # Ignora lives/vídeos de GTA 5 RP, CS2, Roblox, etc.
+
+streamers_br:
+  - handle: "@SkorpionOFICIAL"
+    name: "Skorpion Gamer"
+    priority: 100
+    youtube_live_url: "https://www.youtube.com/@SkorpionOFICIAL/live"
+    youtube_streams_url: "https://www.youtube.com/@SkorpionOFICIAL/streams"
+    youtube_videos_url: "https://www.youtube.com/@SkorpionOFICIAL/videos"
+    twitch_live_url: ""
+    twitch_vods_url: ""
+
+  - handle: "@GamerCosta"
+    name: "Gamer Costa"
+    priority: 98
+    youtube_live_url: "https://www.youtube.com/@GamerCosta/live"
+    youtube_streams_url: "https://www.youtube.com/@GamerCosta/streams"
+    youtube_videos_url: "https://www.youtube.com/@GamerCosta/videos"
+    twitch_live_url: ""
+    twitch_vods_url: ""
+
+  - handle: "@PaulinhoLOKOoficial"
+    name: "Paulinho o Loko"
+    priority: 97
+    youtube_live_url: "https://www.youtube.com/@PaulinhoLOKOoficial/live"
+    youtube_streams_url: "https://www.youtube.com/@PaulinhoLOKOoficial/streams"
+    youtube_videos_url: "https://www.youtube.com/@PaulinhoLOKOoficial/videos"
+    twitch_live_url: "https://www.twitch.tv/paulinholokobr"
+    twitch_vods_url: "https://www.twitch.tv/paulinholokobr/videos?filter=archives&sort=time"
+
+  - handle: "@alanzoka"
+    name: "Alanzoka"
+    priority: 96
+    youtube_live_url: "https://www.youtube.com/@alanzoka/live"
+    youtube_streams_url: "https://www.youtube.com/@alanzoka/streams"
+    youtube_videos_url: "https://www.youtube.com/@alanzoka/videos"
+    twitch_live_url: "https://www.twitch.tv/alanzoka"
+    twitch_vods_url: "https://www.twitch.tv/alanzoka/videos?filter=archives&sort=time"
+
+  - handle: "@loud_coringa"
+    name: "LOUD Coringa"
+    priority: 95
+    youtube_live_url: "https://www.youtube.com/@loud_coringa/live"
+    youtube_streams_url: "https://www.youtube.com/@loud_coringa/streams"
+    youtube_videos_url: "https://www.youtube.com/@loud_coringa/videos"
+    twitch_live_url: "https://www.twitch.tv/loud_coringa"
+    twitch_vods_url: "https://www.twitch.tv/loud_coringa/videos?filter=archives&sort=time"
+
+  - handle: "@funkyblackcat"
+    name: "FunkyBlackCat"
+    priority: 93
+    youtube_live_url: "https://www.youtube.com/@funkyblackcat/live"
+    youtube_streams_url: "https://www.youtube.com/@funkyblackcat/streams"
+    youtube_videos_url: "https://www.youtube.com/@funkyblackcat/videos"
+    twitch_live_url: "https://www.twitch.tv/funkyblackcat"
+    twitch_vods_url: "https://www.twitch.tv/funkyblackcat/videos?filter=archives&sort=time"
+
+  - handle: "@gaules"
+    name: "Gaules"
+    priority: 91
+    youtube_live_url: "https://www.youtube.com/@gaules/live"
+    youtube_streams_url: "https://www.youtube.com/@gaules/streams"
+    youtube_videos_url: ""
+    twitch_live_url: "https://www.twitch.tv/gaules"
+    twitch_vods_url: "https://www.twitch.tv/gaules/videos?filter=archives&sort=time"
+
+  - handle: "@luquet4"
+    name: "Luquet4"
+    priority: 90
+    youtube_live_url: "https://www.youtube.com/@luquet4/live"
+    youtube_streams_url: "https://www.youtube.com/@luquet4/streams"
+    youtube_videos_url: ""
+    twitch_live_url: "https://www.twitch.tv/luquet4"
+    twitch_vods_url: "https://www.twitch.tv/luquet4/videos?filter=archives&sort=time"
+
+  - handle: "@BRKsEDU"
+    name: "BRKsEDU"
+    priority: 89
+    youtube_live_url: "https://www.youtube.com/@BRKsEDU/live"
+    youtube_streams_url: "https://www.youtube.com/@BRKsEDU/streams"
+    youtube_videos_url: "https://www.youtube.com/@BRKsEDU/videos"
+    twitch_live_url: "https://www.twitch.tv/brksedu"
+    twitch_vods_url: ""
+
+  - handle: "@Gameplayrj"
+    name: "Davy Jones (Gameplayrj)"
+    priority: 88
+    youtube_live_url: "https://www.youtube.com/@Gameplayrj/live"
+    youtube_streams_url: "https://www.youtube.com/@Gameplayrj/streams"
+    youtube_videos_url: "https://www.youtube.com/@Gameplayrj/videos"
+    twitch_live_url: ""
+    twitch_vods_url: ""

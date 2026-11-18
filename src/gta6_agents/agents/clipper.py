@@ -14,6 +14,7 @@ from gta6_agents.video.downloader import (
     download_video_segment,
     extract_youtube_subtitles,
     generate_synthetic_source_video,
+    transcribe_local_audio_ptbr,
 )
 from gta6_agents.video.ffmpeg_renderer import render_vertical_short
 from gta6_agents.video.subtitles import build_ass_subtitles, cues_from_script
@@ -100,11 +101,13 @@ class ClipperEditorAgent:
             return path, True
 
         try:
+            prefer_dvr = bool(plan.source.metadata.get("prefer_dvr_window", False))
             segment_path = await download_video_segment(
                 url=url,
                 start_sec=plan.start_sec,
                 end_sec=plan.start_sec + clip_duration,
                 work_dir=clip_work_dir,
+                prefer_dvr_window=prefer_dvr,
             )
             return segment_path, False
         except Exception as exc:
@@ -140,17 +143,44 @@ class ClipperEditorAgent:
             use_demo_source_if_needed=use_demo_source_if_needed,
         )
 
-        # 1. Subtitle cues: prefer explicit plan cues -> YouTube transcript -> timed script cues
-        cues: list[SubtitleCue] = list(plan.subtitles)
-        if not cues and not used_synthetic:
-            langs = self._preferred_subtitle_languages(plan.language)
-            cues = await asyncio.to_thread(
-                extract_youtube_subtitles,
-                plan.source.url,
-                plan.start_sec,
-                plan.start_sec + clip_duration,
-                langs,
+        # 0. Frame-level Vision AI guard on real KY4DWumZffg frames when inside Samira Close / restricted window
+        if (
+            not used_synthetic
+            and plan.for_real_oficial_campaign
+            and bool(plan.source.metadata.get("requires_vision_or_human_hold", False))
+        ):
+            from gta6_agents.agents.live_campaign_ky4 import LiveKY4CampaignEngine
+
+            ky4_guard = LiveKY4CampaignEngine(self.config, self.store)
+            frame_safe, frame_reason = await ky4_guard.inspect_frames_for_forbidden_persons(
+                source_segment,
+                self.config,
             )
+            if not frame_safe:
+                raise RuntimeError(
+                    f"Blocked by KY4DWumZffg Vision Gate before render: {frame_reason}"
+                )
+
+        # 1. Subtitle cues: on real live/streamer audio prefer real speech transcription (Whisper PT-BR -> YT transcript -> plan cues)
+        cues: list[SubtitleCue] = []
+        if not used_synthetic:
+            cues = await transcribe_local_audio_ptbr(
+                source_segment,
+                groq_api_key=self.config.groq_api_key,
+                openai_api_key=self.config.openai_api_key,
+            )
+            if not cues:
+                langs = self._preferred_subtitle_languages(plan.language)
+                cues = await asyncio.to_thread(
+                    extract_youtube_subtitles,
+                    plan.source.url,
+                    plan.start_sec,
+                    plan.start_sec + clip_duration,
+                    langs,
+                )
+
+        if not cues:
+            cues = list(plan.subtitles)
 
         if not cues:
             fallback_script = (

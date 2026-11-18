@@ -1,4 +1,4 @@
-"""Content Discovery & Source Scouting Agent (Acervo, YouTube RSS, Reddit JSON, Offline Curated Fallback)."""
+"""Content Discovery & Source Scouting Agent (KY4DWumZffg Official Live + Brazilian Streamers YouTube/Twitch Lives & VODs)."""
 
 from __future__ import annotations
 
@@ -6,18 +6,21 @@ import asyncio
 import json
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Any
 
 import httpx
+import yaml
 
 from gta6_agents.agents.compliance import (
     DEFAULT_BLACKLIST_HANDLES,
     normalize_handle,
     sanitize_untrusted_video_text,
 )
-from gta6_agents.config import AppConfig
+from gta6_agents.config import AppConfig, get_project_root
 from gta6_agents.models import ContentPillar, SourceCandidate
 from gta6_agents.storage import StateStore
+from gta6_agents.video.downloader import _resolve_ytdlp_cmd
 
 REDDIT_USER_AGENT = (
     "linux:gta6-fast-clips-scout:v1.0.0 (by /u/gta6fastclips; fan commentary curator)"
@@ -31,33 +34,45 @@ REDDIT_FEEDS: list[tuple[str, str]] = [
 
 DEFAULT_WHITELIST_CHANNELS: list[dict[str, Any]] = [
     {
-        "handle": "@RockstarGames",
-        "name": "Rockstar Games",
-        "youtube_channel_id": "UC6VcWc1rAoWdBCM0JxrRQ3A",
-        "is_official": True,
-    },
-    {
-        "handle": "@GTASeriesVideos",
-        "name": "GTA Series Videos",
-        "youtube_channel_id": "UCuWcjpKbIDAbZfHoru1toFg",
+        "handle": "@SkorpionOFICIAL",
+        "name": "Skorpion Gamer",
+        "youtube_channel_id": "",
         "is_official": False,
     },
     {
-        "handle": "@TGGonYT",
-        "name": "TGG",
-        "youtube_channel_id": "UCD23kK2Q4P3H9G5xN4vL2wA",
+        "handle": "@GamerCosta",
+        "name": "Gamer Costa",
+        "youtube_channel_id": "",
         "is_official": False,
     },
     {
-        "handle": "@DarkViperAU",
-        "name": "DarkViperAU",
-        "youtube_channel_id": "UCV6mNrW8CrmWtcxWfQXy11g",
+        "handle": "@PaulinhoLOKOoficial",
+        "name": "Paulinho o Loko",
+        "youtube_channel_id": "",
         "is_official": False,
     },
     {
-        "handle": "@Broughy1322",
-        "name": "Broughy1322",
-        "youtube_channel_id": "UCcZ3sRk9z6jjgfYQbMGTpig",
+        "handle": "@alanzoka",
+        "name": "Alanzoka",
+        "youtube_channel_id": "",
+        "is_official": False,
+    },
+    {
+        "handle": "@loud_coringa",
+        "name": "LOUD Coringa",
+        "youtube_channel_id": "",
+        "is_official": False,
+    },
+    {
+        "handle": "@funkyblackcat",
+        "name": "FunkyBlackCat",
+        "youtube_channel_id": "",
+        "is_official": False,
+    },
+    {
+        "handle": "@gaules",
+        "name": "Gaules",
+        "youtube_channel_id": "",
         "is_official": False,
     },
 ]
@@ -209,9 +224,21 @@ _GTA_RELEVANCE_RE = re.compile(
     re.IGNORECASE,
 )
 
+_GTA6_STRICT_RE = re.compile(
+    r"\b(?:gta\s*6|gta\s*vi|grand\s+theft\s+auto\s*(?:6|vi)|leonida|vice\s+city|"
+    r"lucia|jason\s+duval|grassrivers|kalaga|gellhorn)\b",
+    re.IGNORECASE,
+)
+
+_NON_GTA6_GAME_RE = re.compile(
+    r"\b(?:gta\s*5|gta\s*v|cidade\s+alta|complexo\s+rp|fluxo\s+rp|roblox|beamng|"
+    r"parasite\s+eve|zelda|batman|free\s+fire|valorant|cs2|counter-strike|minecraft|fortnite)\b",
+    re.IGNORECASE,
+)
+
 _HIGH_HOOK_KEYWORDS_RE = re.compile(
-    r"\b(?:ao\s+vivo|live|skorpion|gamer\s+costa|lucia|jason|vice\s+city|leonida|"
-    r"f[ií]sica|physics|insano|rea[cç][aã]o|gameplay|launchdayonyt)\b",
+    r"\b(?:ao\s+vivo|live|skorpion|gamer\s+costa|paulinho|alanzoka|coringa|lucia|jason|"
+    r"vice\s+city|leonida|f[ií]sica|physics|insano|rea[cç][aã]o|gameplay|launchdayonyt)\b",
     re.IGNORECASE,
 )
 
@@ -241,6 +268,28 @@ class ScoutAgent:
         self.config = config
         self.store = store
         self._external_client = http_client
+
+    def _load_streamers_br_config(self) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Load verified Brazilian streamers (YouTube Live + Twitch) from config/streamers_br.yaml."""
+        candidates_paths = [
+            self.config.root_dir / "config" / "streamers_br.yaml",
+            get_project_root() / "config" / "streamers_br.yaml",
+        ]
+        for cfg_path in candidates_paths:
+            if cfg_path.exists():
+                try:
+                    raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+                    if isinstance(raw, dict):
+                        cap_cfg = raw.get("capture_settings", {}) or {}
+                        streamers = raw.get("streamers_br", []) or []
+                        if isinstance(streamers, list):
+                            return (
+                                cap_cfg if isinstance(cap_cfg, dict) else {},
+                                [s for s in streamers if isinstance(s, dict) and s.get("handle")],
+                            )
+                except Exception:
+                    continue
+        return {}, []
 
     def _load_creator_lists(self) -> tuple[list[dict[str, Any]], set[str], list[str]]:
         whitelist = list(DEFAULT_WHITELIST_CHANNELS)
@@ -317,7 +366,7 @@ class ScoutAgent:
         return round(max(0.0, min(100.0, score)), 2)
 
     def _is_campaign_blocked_now(self, campaign_block: dict[str, Any]) -> bool:
-        """Enforce Burnt Peanut live blackout (20:00-20:34 BRT) and hard-stop (20/11 01:57 BRT) in live mode."""
+        """Enforce KY4DWumZffg ON-AIR window (19/11 01:00 -> 20/11 01:57 BRT) and Burnt Peanut blackout (20:00-20:34 BRT)."""
         if self.config.dry_run:
             return False
         from datetime import datetime, timezone
@@ -325,6 +374,14 @@ class ScoutAgent:
         now_utc = datetime.now(timezone.utc)
         schedule_brt = campaign_block.get("schedule_brt", {})
         if isinstance(schedule_brt, dict):
+            live_start_raw = str(schedule_brt.get("live_start_iso", "")).strip()
+            if live_start_raw:
+                try:
+                    live_start_dt = datetime.fromisoformat(live_start_raw).astimezone(timezone.utc)
+                    if now_utc < live_start_dt:
+                        return True
+                except ValueError:
+                    pass
             hard_stop_raw = str(schedule_brt.get("hard_stop_post_iso", "")).strip()
             if hard_stop_raw:
                 try:
@@ -735,22 +792,264 @@ class ScoutAgent:
             return ContentPillar.COUNTDOWN_RECAP
         return ContentPillar.GAMEPLAY_CLIPS
 
+    async def _run_ytdlp_flat_json(self, feed_url: str, max_items: int = 3, timeout_sec: float = 8.0) -> list[dict[str, Any]]:
+        """Run yt-dlp --flat-playlist --dump-json on a Brazilian streamer YouTube/Twitch URL."""
+        cmd = [
+            *_resolve_ytdlp_cmd(),
+            "--flat-playlist",
+            "--dump-json",
+            "--playlist-end",
+            str(max(1, max_items)),
+            "--no-warnings",
+            "--socket-timeout",
+            "5",
+            feed_url,
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout_b, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            return []
+
+        if (proc.returncode or 0) != 0 and not stdout_b:
+            return []
+
+        entries: list[dict[str, Any]] = []
+        for raw_line in stdout_b.decode("utf-8", errors="replace").splitlines():
+            line = raw_line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                parsed = json.loads(line)
+                if isinstance(parsed, dict):
+                    entries.append(parsed)
+            except json.JSONDecodeError:
+                continue
+        return entries
+
+    async def _probe_streamer_feed_ytdlp(
+        self,
+        streamer: dict[str, Any],
+        feed_url: str,
+        *,
+        is_live_endpoint: bool,
+        capture_cfg: dict[str, Any],
+        blacklist: set[str],
+        blocked_keywords: list[str],
+    ) -> list[SourceCandidate]:
+        """Extract GTA VI live streams or VOD segments from one Brazilian streamer's YouTube/Twitch feed."""
+        if not feed_url:
+            return []
+
+        handle = _ensure_at_handle(str(streamer.get("handle", "@SkorpionOFICIAL")))
+        streamer_name = str(streamer.get("name", handle.lstrip("@")))
+        priority_score = float(streamer.get("priority", 90.0))
+        clip_dur = float(capture_cfg.get("clip_duration_sec", 25.0))
+        strict_gta6 = bool(capture_cfg.get("strict_gta6_only_filter", True))
+        vod_offsets = capture_cfg.get("vod_hot_moments_offsets_sec") or [180, 600, 1200]
+
+        raw_entries = await self._run_ytdlp_flat_json(feed_url, max_items=3)
+        results: list[SourceCandidate] = []
+
+        from datetime import datetime, timezone
+
+        live_bucket = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")[:-1] + "0"  # 10-min rolling live window
+
+        for entry in raw_entries:
+            raw_title = str(entry.get("title") or "").strip()
+            raw_desc = str(entry.get("description") or "").strip()
+            if not raw_title:
+                continue
+
+            title = sanitize_untrusted_video_text(raw_title, max_length=160)
+            summary = sanitize_untrusted_video_text(
+                raw_desc or f"Corte de live/gameplay de {streamer_name} ({handle}) jogando GTA VI em português.",
+                max_length=360,
+            )
+            combined = f"{title} {summary}"
+
+            # Hard-reject GTA 5 RP, Roblox, CS2, or any non-GTA6 game from Brazilian streamer channels
+            if _NON_GTA6_GAME_RE.search(combined):
+                continue
+            if strict_gta6 and not _GTA6_STRICT_RE.search(combined):
+                continue
+            if self._is_blocked_content(handle, title, summary, blacklist, blocked_keywords):
+                continue
+
+            webpage_url = str(entry.get("webpage_url") or entry.get("url") or "").strip()
+            vid_id = str(entry.get("id") or "").strip()
+            if webpage_url.startswith("http"):
+                canonical_url = webpage_url.split("#", 1)[0]
+            elif vid_id and "youtube.com" in feed_url:
+                canonical_url = f"https://www.youtube.com/watch?v={vid_id}"
+            elif vid_id and "twitch.tv" in feed_url:
+                canonical_url = (
+                    f"https://www.twitch.tv/videos/{vid_id.lstrip('v')}"
+                    if not is_live_endpoint
+                    else feed_url.split("?", 1)[0]
+                )
+            else:
+                canonical_url = feed_url
+
+            platform_type = "twitch" if "twitch.tv" in canonical_url.lower() else "youtube"
+            entry_is_live = (
+                is_live_endpoint
+                or bool(entry.get("is_live", False))
+                or str(entry.get("live_status") or "") == "is_live"
+            )
+            duration = float(entry.get("duration") or 0.0)
+
+            score = self._score_candidate(
+                base_score=min(95.0, max(80.0, priority_score * 0.92)),
+                title=title,
+                summary=summary,
+                is_official=False,
+                is_campaign_acervo=False,
+                is_whitelisted=True,
+                engagement_bonus=4.0 if entry_is_live else 2.0,
+            )
+
+            if entry_is_live:
+                seg_url = f"{canonical_url}#live-{live_bucket}"
+                if self.store.is_source_seen(seg_url):
+                    continue
+                results.append(
+                    SourceCandidate(
+                        title=f"{streamer_name} AO VIVO — {title}"[:160],
+                        url=seg_url,
+                        creator_handle=handle,
+                        source_type=platform_type,
+                        is_official=False,
+                        is_campaign_acervo=False,
+                        pillar=ContentPillar.GAMEPLAY_CLIPS,
+                        summary=summary,
+                        verified_facts=[
+                            f"Corte capturado ao vivo da transmissão em português de {streamer_name} ({handle}).",
+                            f"Fonte pública verificada ({platform_type}).",
+                        ],
+                        suggested_start_sec=0.0,
+                        suggested_end_sec=clip_dur,
+                        virality_score=score,
+                        metadata={
+                            "canonical_url": canonical_url,
+                            "is_live": True,
+                            "streamer_br": True,
+                            "streamer_name": streamer_name,
+                            "platform": platform_type,
+                        },
+                    )
+                )
+            else:
+                valid_offsets: list[float] = []
+                for raw_off in vod_offsets:
+                    off = float(raw_off)
+                    if duration <= 0.0 or (off + clip_dur + 5.0 <= duration):
+                        valid_offsets.append(off)
+                    if len(valid_offsets) >= 2:
+                        break
+                if not valid_offsets:
+                    valid_offsets = [max(0.0, min(30.0, duration * 0.2))] if duration > clip_dur else [0.0]
+
+                for off_sec in valid_offsets:
+                    end_sec = off_sec + clip_dur
+                    seg_url = f"{canonical_url}#{int(off_sec)}-{int(end_sec)}"
+                    if self.store.is_source_seen(seg_url):
+                        continue
+                    results.append(
+                        SourceCandidate(
+                            title=f"{streamer_name} — {title}"[:160],
+                            url=seg_url,
+                            creator_handle=handle,
+                            source_type=platform_type,
+                            is_official=False,
+                            is_campaign_acervo=False,
+                            pillar=ContentPillar.GAMEPLAY_CLIPS,
+                            summary=summary,
+                            verified_facts=[
+                                f"Corte de live/VOD em português do streamer brasileiro {streamer_name} ({handle}).",
+                            ],
+                            suggested_start_sec=off_sec,
+                            suggested_end_sec=end_sec,
+                            virality_score=score,
+                            metadata={
+                                "canonical_url": canonical_url,
+                                "is_live": False,
+                                "duration": duration,
+                                "streamer_br": True,
+                                "streamer_name": streamer_name,
+                                "platform": platform_type,
+                            },
+                        )
+                    )
+
+        return results
+
+    async def discover_br_streamer_streams(
+        self,
+        blacklist: set[str],
+        blocked_keywords: list[str],
+        max_streamers: int = 8,
+    ) -> list[SourceCandidate]:
+        """Discover active GTA VI lives & recent VODs from top Brazilian streamers (YouTube + Twitch)."""
+        capture_cfg, streamers = self._load_streamers_br_config()
+        if not streamers:
+            return []
+
+        ordered = sorted(streamers, key=lambda s: float(s.get("priority", 0)), reverse=True)[:max_streamers]
+        tasks = []
+        for st in ordered:
+            for key, is_live_ep in (
+                ("youtube_live_url", True),
+                ("twitch_live_url", True),
+                ("youtube_streams_url", False),
+                ("twitch_vods_url", False),
+                ("youtube_videos_url", False),
+            ):
+                f_url = str(st.get(key) or "").strip()
+                if f_url:
+                    tasks.append(
+                        self._probe_streamer_feed_ytdlp(
+                            st,
+                            f_url,
+                            is_live_endpoint=is_live_ep,
+                            capture_cfg=capture_cfg,
+                            blacklist=blacklist,
+                            blocked_keywords=blocked_keywords,
+                        )
+                    )
+
+        if not tasks:
+            return []
+
+        batches = await asyncio.gather(*tasks, return_exceptions=True)
+        discovered: list[SourceCandidate] = []
+        for batch in batches:
+            if isinstance(batch, list):
+                discovered.extend(batch)
+        return discovered
+
     def _curated_offline_fallbacks(
         self, blacklist: set[str], blocked_keywords: list[str]
     ) -> list[SourceCandidate]:
-        """Curated PT-BR Streamer Live Cuts of GTA VI (post-live / non-campaign streamer mode)."""
+        """Curated PT-BR Streamer Live Cuts of GTA VI (post-live / offline fallback mode)."""
         curated_raw: list[dict[str, Any]] = [
             {
                 "title": "Skorpion Ao Vivo Explorando Vice City à Noite em GTA VI",
-                "url": "https://www.youtube.com/watch?v=skorpion_live_vicecity_01",
-                "creator_handle": "@Skorpion",
+                "url": "https://www.youtube.com/@SkorpionOFICIAL/live#fallback-01",
+                "creator_handle": "@SkorpionOFICIAL",
                 "source_type": "youtube",
                 "is_official": False,
                 "pillar": ContentPillar.GAMEPLAY_CLIPS,
                 "summary": "Corte de live em português com Skorpion testando carros esportivos e reflexos neon na Ocean Drive em GTA VI.",
                 "verified_facts": [
                     "Corte de live em português focado 100% em gameplay ao vivo de GTA VI em Vice City.",
-                    "Crédito ao streamer original @Skorpion.",
+                    "Crédito ao streamer original @SkorpionOFICIAL.",
                 ],
                 "start_sec": 4.0,
                 "end_sec": 28.0,
@@ -758,9 +1057,9 @@ class ScoutAgent:
             },
             {
                 "title": "Alanzoka Reage à Física Insana de Perseguição em Leonida Keys",
-                "url": "https://www.youtube.com/watch?v=alanzoka_live_leonidakeys_01",
+                "url": "https://www.twitch.tv/alanzoka#fallback-01",
                 "creator_handle": "@alanzoka",
-                "source_type": "youtube",
+                "source_type": "twitch",
                 "is_official": False,
                 "pillar": ContentPillar.GAMEPLAY_CLIPS,
                 "summary": "Momento hilário e tenso da live do Alanzoka cruzando as pontes de Leonida Keys em alta velocidade no GTA VI.",
@@ -774,7 +1073,7 @@ class ScoutAgent:
             },
             {
                 "title": "Gamer Costa Descobre Detalhes Escondidos nos Pântanos de Grassrivers Ao Vivo",
-                "url": "https://www.youtube.com/watch?v=gamercosta_live_grassrivers_01",
+                "url": "https://www.youtube.com/@GamerCosta/live#fallback-01",
                 "creator_handle": "@GamerCosta",
                 "source_type": "youtube",
                 "is_official": False,
@@ -790,9 +1089,9 @@ class ScoutAgent:
             },
             {
                 "title": "Coringa Testando Fuga Cinematográfica com Lucia e Jason em Vice Beach",
-                "url": "https://www.youtube.com/watch?v=coringa_live_vicebeach_01",
+                "url": "https://www.twitch.tv/loud_coringa#fallback-01",
                 "creator_handle": "@loud_coringa",
-                "source_type": "youtube",
+                "source_type": "twitch",
                 "is_official": False,
                 "pillar": ContentPillar.GAMEPLAY_CLIPS,
                 "summary": "Corte explosivo da live do Coringa mostrando a densidade de trânsito e reação policial em Vice Beach no GTA VI.",
@@ -806,9 +1105,9 @@ class ScoutAgent:
             },
             {
                 "title": "Paulinho o Loko Fazendo Drift de Muscle Car em Port Gellhorn Ao Vivo",
-                "url": "https://www.youtube.com/watch?v=paulinho_live_gellhorn_01",
-                "creator_handle": "@PaulinhooLoko",
-                "source_type": "youtube",
+                "url": "https://www.twitch.tv/paulinholokobr#fallback-01",
+                "creator_handle": "@PaulinhoLOKOoficial",
+                "source_type": "twitch",
                 "is_official": False,
                 "pillar": ContentPillar.GAMEPLAY_CLIPS,
                 "summary": "Reação ao vivo do chat na live do Paulinho o Loko testando a suspensão e fumaça dos pneus em Port Gellhorn.",
@@ -822,8 +1121,8 @@ class ScoutAgent:
             },
             {
                 "title": "FunkyBlackCat Analisa a Iluminação e Interiores de GTA VI Ao Vivo",
-                "url": "https://www.youtube.com/watch?v=funky_live_leonida_01",
-                "creator_handle": "@FunkyBlackCat",
+                "url": "https://www.youtube.com/@funkyblackcat/live#fallback-01",
+                "creator_handle": "@funkyblackcat",
                 "source_type": "youtube",
                 "is_official": False,
                 "pillar": ContentPillar.GAMEPLAY_CLIPS,
@@ -837,9 +1136,9 @@ class ScoutAgent:
             },
             {
                 "title": "Gaules & Tribo Reagindo às Primeiras Horas em Mount Kalaga no GTA VI",
-                "url": "https://www.youtube.com/watch?v=gaules_live_kalaga_01",
-                "creator_handle": "@Gaules",
-                "source_type": "youtube",
+                "url": "https://www.twitch.tv/gaules#fallback-01",
+                "creator_handle": "@gaules",
+                "source_type": "twitch",
                 "is_official": False,
                 "pillar": ContentPillar.GAMEPLAY_CLIPS,
                 "summary": "Momento de puro hype na live do Gaules acompanhando trilhas off-road em Mount Kalaga National Park.",
@@ -926,11 +1225,24 @@ class ScoutAgent:
                 )
                 return collected[:limit]
 
-        # 2. Live YouTube RSS + Reddit JSON feeds (graceful timeout & exception isolation)
+        # 2. Brazilian Streamer Lives & VODs (YouTube + Twitch via yt-dlp) + YouTube RSS
         scout_cfg = (self.config.settings or {}).get("scout", {})
         offline_only = bool(scout_cfg.get("offline_only", False)) if isinstance(scout_cfg, dict) else False
+        enable_ytdlp_in_dry = (
+            bool(scout_cfg.get("enable_ytdlp_in_dry_run", False)) if isinstance(scout_cfg, dict) else False
+        )
 
         if not offline_only:
+            if not self.config.dry_run or enable_ytdlp_in_dry:
+                try:
+                    br_streamer_candidates = await self.discover_br_streamer_streams(
+                        blacklist,
+                        blocked_keywords,
+                    )
+                    _add_unique(br_streamer_candidates)
+                except Exception:
+                    pass
+
             timeout = httpx.Timeout(3.5, connect=2.0)
             if self._external_client is not None:
                 live_batches = await self._gather_live_feeds(
@@ -972,8 +1284,13 @@ class ScoutAgent:
             for ch in whitelist
             if ch.get("youtube_channel_id")
         ]
-        for sub, url in REDDIT_FEEDS:
-            tasks.append(self._fetch_reddit_feed(client, sub, url, blacklist, blocked_keywords))
+        content_focus = str((self.config.settings or {}).get("page", {}).get("content_focus", ""))
+        if content_focus != "streamer_live_clips_only":
+            for sub, url in REDDIT_FEEDS:
+                tasks.append(self._fetch_reddit_feed(client, sub, url, blacklist, blocked_keywords))
+
+        if not tasks:
+            return []
 
         raw_results = await asyncio.gather(*tasks, return_exceptions=True)
         valid_batches: list[list[SourceCandidate]] = []

@@ -30,7 +30,7 @@ def _make_pipeline_test_config(tmp_path: Path) -> AppConfig:
     repo_root = get_project_root()
     cfg_dir = tmp_path / "config"
     cfg_dir.mkdir(parents=True, exist_ok=True)
-    for fname in ("settings.yaml", "campaign_realoficial.yaml", "channels_matrix.yaml"):
+    for fname in ("settings.yaml", "campaign_realoficial.yaml", "channels_matrix.yaml", "streamers_br.yaml"):
         src = repo_root / "config" / fname
         if src.exists():
             shutil.copy2(src, cfg_dir / fname)
@@ -228,3 +228,111 @@ def test_mission_control_dashboard_routes(tmp_path: Path) -> None:
     assert approve_resp.status_code == 200
     assert approve_resp.json()["status"] == "approved"
     assert client.get("/api/status").json()["metrics"]["pending_approvals_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_download_video_segment_routes_active_live_streams_to_hls_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gta6_agents.video import downloader
+
+    captured_calls: list[dict[str, object]] = []
+
+    async def _fake_probe(url: str, timeout_sec: float = 15.0) -> dict[str, object]:
+        return {"id": "KY4DWumZffg", "is_live": True, "live_status": "is_live", "duration": 0.0}
+
+    async def _fake_capture_live(
+        url: str,
+        duration_sec: float,
+        output_path: Path,
+        *,
+        start_sec: float = 0.0,
+        prefer_dvr_window: bool = False,
+    ) -> Path:
+        captured_calls.append(
+            {
+                "url": url,
+                "duration_sec": duration_sec,
+                "start_sec": start_sec,
+                "prefer_dvr_window": prefer_dvr_window,
+            }
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"\x00" * 4096)
+        return output_path
+
+    monkeypatch.setattr(downloader, "probe_stream_metadata", _fake_probe)
+    monkeypatch.setattr(downloader, "capture_live_stream_segment", _fake_capture_live)
+
+    result_path = await downloader.download_video_segment(
+        "https://www.youtube.com/watch?v=KY4DWumZffg#live-window-1",
+        start_sec=120.0,
+        end_sec=145.0,
+        work_dir=tmp_path / "live_work",
+        prefer_dvr_window=True,
+    )
+    assert result_path.exists()
+    assert len(captured_calls) == 1
+    assert captured_calls[0]["url"] == "https://www.youtube.com/watch?v=KY4DWumZffg"
+    assert captured_calls[0]["duration_sec"] == 25.0
+    assert captured_calls[0]["prefer_dvr_window"] is True
+
+
+@pytest.mark.asyncio
+async def test_scout_discovers_brazilian_streamers_and_blocks_gta5_rp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gta6_agents.agents.scout import ScoutAgent
+
+    cfg = _make_pipeline_test_config(tmp_path)
+    store = StateStore(cfg.data_dir, cfg.memory_dir)
+    scout = ScoutAgent(cfg, store)
+
+    cap_cfg, streamers_br = scout._load_streamers_br_config()
+    handles = {s["handle"] for s in streamers_br}
+    assert len(streamers_br) >= 10
+    assert "@SkorpionOFICIAL" in handles
+    assert "@GamerCosta" in handles
+    assert "@PaulinhoLOKOoficial" in handles
+    assert "@alanzoka" in handles
+    assert "@loud_coringa" in handles
+
+    async def _fake_ytdlp_flat(feed_url: str, max_items: int = 3, timeout_sec: float = 8.0):
+        if "paulinholokobr" in feed_url:
+            return [
+                {
+                    "id": "gta5_rp_old",
+                    "title": "PAULINHO O LOKO FUGA NA CIDADE ALTA GTA 5 RP",
+                    "description": "Live de GTA V RP",
+                    "is_live": True,
+                },
+                {
+                    "id": "gta6_vice_live",
+                    "title": "PRIMEIRA GAMEPLAY DE GTA 6 AO VIVO EM VICE CITY! LEONIDA INSANA",
+                    "description": "Jogando GTA VI em português ao vivo",
+                    "webpage_url": "https://www.twitch.tv/paulinholokobr",
+                    "is_live": True,
+                },
+            ]
+        return []
+
+    monkeypatch.setattr(scout, "_run_ytdlp_flat_json", _fake_ytdlp_flat)
+    _, blacklist, blocked_kw = scout._load_creator_lists()
+    paulinho_cfg = next(s for s in streamers_br if s["handle"] == "@PaulinhoLOKOoficial")
+
+    found = await scout._probe_streamer_feed_ytdlp(
+        paulinho_cfg,
+        paulinho_cfg["twitch_live_url"],
+        is_live_endpoint=True,
+        capture_cfg=cap_cfg,
+        blacklist=blacklist,
+        blocked_keywords=blocked_kw,
+    )
+    assert len(found) == 1
+    assert "GTA 6" in found[0].title
+    assert "CIDADE ALTA" not in found[0].title
+    assert found[0].creator_handle == "@PaulinhoLOKOoficial"
+    assert found[0].source_type == "twitch"
+

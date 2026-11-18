@@ -1,22 +1,26 @@
-"""Video segment downloader, YouTube transcript extractor, and offline synthetic clip generator."""
+"""Video segment downloader (YouTube/Twitch Live HLS, DVR, & VOD slices), Whisper/YT transcripts, and synthetic demo generator."""
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
+
+import httpx
 
 from gta6_agents.models import SubtitleCue
 
 logger = logging.getLogger(__name__)
 
-# Cap downloads at 1080p MP4 (skip 4K) to keep rendering and Shorts/Reels uploads fast.
+# Cap downloads at 1080p MP4 (skip 4K) to keep rendering and Shorts/Reels/TikTok uploads fast.
 YTDLP_1080P_FORMAT = (
     "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/"
     "bestvideo[height<=1080]+bestaudio/"
@@ -24,12 +28,19 @@ YTDLP_1080P_FORMAT = (
     "best[height<=1080]/best"
 )
 
+YTDLP_LIVE_HLS_FORMAT = (
+    "best[height<=1080][protocol^=m3u8]/"
+    "best[height<=1080]/"
+    "bestvideo[height<=1080]+bestaudio/"
+    "best"
+)
+
 _YT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 
 def extract_youtube_video_id(url: str) -> str | None:
     """Extract the 11-character YouTube video ID from standard, Shorts, live, or short URLs."""
-    raw = (url or "").strip()
+    raw = (url or "").strip().split("#", 1)[0]
     if not raw:
         return None
     if _YT_ID_RE.match(raw):
@@ -127,17 +138,247 @@ async def _run_subprocess(cmd: list[str], timeout_sec: float = 180.0) -> tuple[i
     )
 
 
+async def probe_stream_metadata(url: str, timeout_sec: float = 15.0) -> dict[str, Any]:
+    """Inspect a YouTube or Twitch URL via yt-dlp to detect `is_live`, `live_status`, and `duration`."""
+    clean_url = (url or "").strip().split("#", 1)[0]
+    if not clean_url:
+        return {}
+    cmd = [
+        *_resolve_ytdlp_cmd(),
+        "--no-playlist",
+        "--no-warnings",
+        "--socket-timeout",
+        "8",
+        "--dump-single-json",
+        clean_url,
+    ]
+    try:
+        rc, out, _ = await _run_subprocess(cmd, timeout_sec=timeout_sec)
+        if rc != 0 or not out.strip():
+            return {}
+        data = json.loads(out.strip().splitlines()[-1])
+        if not isinstance(data, dict):
+            return {}
+        return {
+            "id": str(data.get("id") or ""),
+            "title": str(data.get("title") or ""),
+            "uploader": str(data.get("uploader") or data.get("channel") or ""),
+            "is_live": bool(data.get("is_live", False)) or data.get("live_status") == "is_live",
+            "live_status": str(data.get("live_status") or ""),
+            "duration": float(data.get("duration") or 0.0),
+            "webpage_url": str(data.get("webpage_url") or clean_url),
+        }
+    except Exception as exc:
+        logger.debug("probe_stream_metadata could not inspect %s: %s", clean_url, exc)
+        return {}
+
+
+async def _resolve_direct_stream_urls(url: str, *, is_live: bool = False) -> list[str]:
+    """Use `yt-dlp -g` to obtain direct HLS (.m3u8) or HTTP MP4/WebM stream URLs."""
+    fmt = YTDLP_LIVE_HLS_FORMAT if is_live else YTDLP_1080P_FORMAT
+    cmd = [
+        *_resolve_ytdlp_cmd(),
+        "--no-playlist",
+        "--no-warnings",
+        "--socket-timeout",
+        "10",
+        "-f",
+        fmt,
+        "-g",
+        url,
+    ]
+    rc, out, _ = await _run_subprocess(cmd, timeout_sec=25.0)
+    if rc != 0 or not out.strip():
+        return []
+    return [line.strip() for line in out.splitlines() if line.strip().startswith("http")]
+
+
+async def capture_live_stream_segment(
+    url: str,
+    duration_sec: float,
+    output_path: Path,
+    *,
+    start_sec: float = 0.0,
+    prefer_dvr_window: bool = False,
+) -> Path:
+    """Capture a real-time segment from an active YouTube Live (`KY4DWumZffg` / `@streamer/live`) or Twitch Live stream."""
+    clean_url = (url or "").strip().split("#", 1)[0]
+    duration = max(5.0, min(58.0, float(duration_sec)))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    ytdlp_prefix = _resolve_ytdlp_cmd()
+
+    # 1. Optional DVR window cut on YouTube Live (`--live-from-start --download-sections`)
+    if prefer_dvr_window and start_sec > 0.0 and "twitch.tv" not in clean_url.lower():
+        end_sec = start_sec + duration
+        dvr_template = str(output_path.parent / f"dvr_{output_path.stem}.%(ext)s")
+        dvr_cmd = [
+            *ytdlp_prefix,
+            "--no-playlist",
+            "--no-warnings",
+            "--live-from-start",
+            "--socket-timeout",
+            "10",
+            "-f",
+            YTDLP_1080P_FORMAT,
+            "--merge-output-format",
+            "mp4",
+            "--download-sections",
+            f"*{start_sec:.2f}-{end_sec:.2f}",
+            "-o",
+            dvr_template,
+            clean_url,
+        ]
+        try:
+            rc_dvr, _, _ = await _run_subprocess(dvr_cmd, timeout_sec=max(65.0, duration + 35.0))
+            dvr_mp4 = output_path.parent / f"dvr_{output_path.stem}.mp4"
+            if rc_dvr == 0 and dvr_mp4.exists() and dvr_mp4.stat().st_size > 2048:
+                dvr_mp4.replace(output_path)
+                return output_path
+        except Exception as exc:
+            logger.debug("DVR section capture fallback to live-edge HLS for %s: %s", clean_url, exc)
+
+    # 2. Direct Real-Time Live-Edge HLS Capture via FFmpeg (works on YouTube Live & Twitch Live!)
+    stream_urls = await _resolve_direct_stream_urls(clean_url, is_live=True)
+    if not stream_urls:
+        raise RuntimeError(f"Could not extract live HLS stream URL via yt-dlp for {clean_url}")
+
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-reconnect",
+        "1",
+        "-reconnect_streamed",
+        "1",
+        "-reconnect_delay_max",
+        "5",
+        "-i",
+        stream_urls[0],
+    ]
+    if len(stream_urls) >= 2:
+        ffmpeg_cmd.extend(
+            [
+                "-reconnect",
+                "1",
+                "-reconnect_streamed",
+                "1",
+                "-reconnect_delay_max",
+                "5",
+                "-i",
+                stream_urls[1],
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+            ]
+        )
+
+    ffmpeg_cmd.extend(
+        [
+            "-t",
+            f"{duration:.2f}",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ]
+    )
+
+    rc_ff, _, err_ff = await _run_subprocess(ffmpeg_cmd, timeout_sec=duration + 45.0)
+    if rc_ff != 0 or not output_path.exists() or output_path.stat().st_size <= 2048:
+        raise RuntimeError(f"Live-edge FFmpeg capture failed for {clean_url}: {err_ff.strip()}")
+    return output_path
+
+
+async def _capture_vod_via_ffmpeg_http_seek(
+    clean_url: str,
+    start_sec: float,
+    duration_sec: float,
+    output_path: Path,
+) -> Path:
+    """Fast HTTP byte-range seek for multi-hour YouTube/Twitch VODs without downloading gigabytes."""
+    stream_urls = await _resolve_direct_stream_urls(clean_url, is_live=False)
+    if not stream_urls:
+        raise RuntimeError(f"Could not resolve direct VOD URLs for HTTP seek on {clean_url}")
+
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-ss",
+        f"{max(0.0, start_sec):.2f}",
+        "-i",
+        stream_urls[0],
+    ]
+    if len(stream_urls) >= 2:
+        ffmpeg_cmd.extend(
+            [
+                "-ss",
+                f"{max(0.0, start_sec):.2f}",
+                "-i",
+                stream_urls[1],
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+            ]
+        )
+    ffmpeg_cmd.extend(
+        [
+            "-t",
+            f"{max(1.0, duration_sec):.2f}",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ]
+    )
+    rc, _, err = await _run_subprocess(ffmpeg_cmd, timeout_sec=90.0)
+    if rc != 0 or not output_path.exists() or output_path.stat().st_size <= 2048:
+        raise RuntimeError(f"FFmpeg HTTP VOD seek failed for {clean_url}: {err.strip()}")
+    return output_path
+
+
 async def download_video_segment(
     url: str,
     start_sec: float,
     end_sec: float,
     work_dir: Path,
+    *,
+    prefer_dvr_window: bool = False,
 ) -> Path:
-    """Download a 1080p MP4 segment [start_sec, end_sec] using yt-dlp (with FFmpeg post-trim fallback)."""
+    """Download a 1080p MP4 segment [start_sec, end_sec] from YouTube/Twitch Live, DVR, or VOD."""
     raw_url = (url or "").strip()
     if not raw_url:
         raise ValueError("Source video URL cannot be empty.")
 
+    clean_url = raw_url.split("#", 1)[0]
     start = max(0.0, float(start_sec))
     end = max(start + 1.0, float(end_sec))
     duration = end - start
@@ -151,10 +392,10 @@ async def download_video_segment(
 
     # Support local file paths or file:// URLs directly.
     local_candidate: Path | None = None
-    if raw_url.startswith("file://"):
-        local_candidate = Path(urlparse(raw_url).path)
-    elif "://" not in raw_url:
-        p = Path(raw_url)
+    if clean_url.startswith("file://"):
+        local_candidate = Path(urlparse(clean_url).path)
+    elif "://" not in clean_url:
+        p = Path(clean_url)
         if p.exists() and p.is_file():
             local_candidate = p
 
@@ -163,8 +404,23 @@ async def download_video_segment(
             raise FileNotFoundError(f"Local source video does not exist: {local_candidate}")
         return await asyncio.to_thread(_trim_local_video, local_candidate, output_path, start, duration)
 
-    if raw_url.startswith(("synthetic://", "demo://", "mock://")):
+    if clean_url.startswith(("synthetic://", "demo://", "mock://")):
         raise RuntimeError(f"Synthetic scheme URL cannot be downloaded remotely: {raw_url}")
+
+    # Probe stream metadata first so active live streams (`KY4DWumZffg`, `@streamer/live`, `twitch.tv/...`)
+    # use real-time HLS/DVR capture instead of hanging on full-VOD download!
+    meta = await probe_stream_metadata(clean_url)
+    is_live_url_hint = clean_url.rstrip("/").endswith("/live") or (
+        "twitch.tv/" in clean_url.lower() and "/videos" not in clean_url.lower() and "/clip/" not in clean_url.lower()
+    )
+    if meta.get("is_live") or (not meta and is_live_url_hint):
+        return await capture_live_stream_segment(
+            clean_url,
+            duration_sec=duration,
+            output_path=output_path,
+            start_sec=start,
+            prefer_dvr_window=prefer_dvr_window,
+        )
 
     ytdlp_prefix = _resolve_ytdlp_cmd()
     temp_section_template = str(work_dir / f"raw_sec_{digest}.%(ext)s")
@@ -187,7 +443,7 @@ async def download_video_segment(
         "--force-keyframes-at-cuts",
         "-o",
         temp_section_template,
-        raw_url,
+        clean_url,
     ]
 
     rc, _, err = await _run_subprocess(section_cmd, timeout_sec=120.0)
@@ -196,9 +452,15 @@ async def download_video_segment(
         downloaded_sec.replace(output_path)
         return output_path
 
-    logger.debug("yt-dlp --download-sections failed (%s); trying full <=1080p download + FFmpeg trim.", err.strip())
+    # For long streamer VODs (>20 min), use HTTP byte-range FFmpeg seek instead of downloading multi-GB VODs
+    vod_duration = float(meta.get("duration") or 0.0)
+    if vod_duration > 1200.0 or "twitch.tv" in clean_url.lower():
+        logger.debug("Long VOD / Twitch VOD detected (%.0fs); using FFmpeg HTTP seek.", vod_duration)
+        return await _capture_vod_via_ffmpeg_http_seek(clean_url, start, duration, output_path)
 
-    # Fallback: download full <=1080p video and trim locally with FFmpeg.
+    logger.debug("yt-dlp --download-sections failed (%s); trying short-video <=1080p download + FFmpeg trim.", err.strip())
+
+    # Fallback for short videos/clips (<=20 min): download full <=1080p video and trim locally with FFmpeg.
     temp_full_template = str(work_dir / f"raw_full_{digest}.%(ext)s")
     full_cmd = [
         *ytdlp_prefix,
@@ -214,19 +476,100 @@ async def download_video_segment(
         "mp4",
         "-o",
         temp_full_template,
-        raw_url,
+        clean_url,
     ]
     rc_full, _, err_full = await _run_subprocess(full_cmd, timeout_sec=180.0)
     downloaded_full = work_dir / f"raw_full_{digest}.mp4"
     if rc_full != 0 or not downloaded_full.exists() or downloaded_full.stat().st_size == 0:
         raise RuntimeError(
-            f"yt-dlp failed to download {raw_url}: {(err_full or err).strip() or f'exit code {rc_full}'}"
+            f"yt-dlp failed to download {clean_url}: {(err_full or err).strip() or f'exit code {rc_full}'}"
         )
 
     try:
         return await asyncio.to_thread(_trim_local_video, downloaded_full, output_path, start, duration)
     finally:
         downloaded_full.unlink(missing_ok=True)
+
+
+async def transcribe_local_audio_ptbr(
+    video_path: Path,
+    *,
+    groq_api_key: str = "",
+    openai_api_key: str = "",
+) -> list[SubtitleCue]:
+    """Transcribe real spoken PT-BR streamer audio from a downloaded live/VOD segment via Groq or OpenAI Whisper."""
+    groq_key = (groq_api_key or "").strip()
+    oai_key = (openai_api_key or "").strip()
+    if (not groq_key and not oai_key) or not video_path.exists():
+        return []
+
+    audio_mp3 = video_path.parent / f"{video_path.stem}_stt_16k.mp3"
+    extract_cmd = [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(video_path),
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-b:a",
+        "48k",
+        str(audio_mp3),
+    ]
+    rc, _, _ = await _run_subprocess(extract_cmd, timeout_sec=25.0)
+    if rc != 0 or not audio_mp3.exists() or audio_mp3.stat().st_size < 512:
+        return []
+
+    endpoint = (
+        "https://api.groq.com/openai/v1/audio/transcriptions"
+        if groq_key
+        else "https://api.openai.com/v1/audio/transcriptions"
+    )
+    api_key = groq_key or oai_key
+    model_name = "whisper-large-v3-turbo" if groq_key else "whisper-1"
+
+    try:
+        audio_bytes = await asyncio.to_thread(audio_mp3.read_bytes)
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            resp = await client.post(
+                endpoint,
+                headers={"Authorization": f"Bearer {api_key}"},
+                data={
+                    "model": model_name,
+                    "language": "pt",
+                    "response_format": "verbose_json",
+                },
+                files={"file": (audio_mp3.name, audio_bytes, "audio/mpeg")},
+            )
+            if resp.status_code != 200:
+                return []
+            payload = resp.json()
+    except Exception as exc:
+        logger.debug("Whisper live audio transcription unavailable: %s", exc)
+        return []
+    finally:
+        audio_mp3.unlink(missing_ok=True)
+
+    segments = payload.get("segments") if isinstance(payload, dict) else None
+    if not isinstance(segments, list) or not segments:
+        return []
+
+    cues: list[SubtitleCue] = []
+    for seg in segments:
+        if not isinstance(seg, dict):
+            continue
+        seg_text = " ".join(str(seg.get("text", "")).split()).strip()
+        if not seg_text:
+            continue
+        s_t = max(0.0, float(seg.get("start", 0.0)))
+        e_t = max(s_t + 0.3, float(seg.get("end", s_t + 2.0)))
+        cues.extend(_split_cue_into_short_chunks(s_t, e_t, seg_text))
+    return cues
 
 
 def _expand_language_preferences(languages: list[str]) -> list[str]:
