@@ -166,23 +166,36 @@ def _collect_status_payload(cfg: AppConfig, store: StateStore) -> dict[str, Any]
         enriched["pillar"] = _infer_pillar(enriched)
         publications.append(enriched)
         if (
-            enriched.get("platform") == "youtube_shorts"
+            enriched.get("platform") in ("instagram_reels", "tiktok", "youtube_shorts")
             and str(enriched.get("created_at", "")).startswith(today_prefix)
         ):
             shorts_today += 1
+
+    campaign_cfg = cfg.campaign.get("campaign", {}) if isinstance(cfg.campaign, dict) else {}
+    rewards_cfg = campaign_cfg.get("rewards", {}) if isinstance(campaign_cfg, dict) else {}
+    rules_cfg = campaign_cfg.get("rules", {}) if isinstance(campaign_cfg, dict) else {}
+
+    cpm_brl = float(rewards_cfg.get("cpm_brl_per_1k_views", 4.00))
+    min_views_threshold = int(rewards_cfg.get("min_views_threshold_per_video", 5000))
+    max_payout_per_video = float(rewards_cfg.get("max_payout_brl_per_video", 400.00))
 
     entries = store.list_championship_entries(limit=50)
     validated_views_total = sum(int(e.get("validated_views") or 0) for e in entries)
     estimated_earnings_brl = round(
         sum(
-            (int(e.get("validated_views") or 0) / 1000.0)
-            * float(e.get("estimated_cpm_brl") or 1.25)
+            min(
+                max_payout_per_video,
+                (int(e.get("validated_views") or 0) / 1000.0)
+                * float(e.get("estimated_cpm_brl") or cpm_brl),
+            )
+            if int(e.get("validated_views") or 0) >= min_views_threshold
+            else 0.0
             for e in entries
         ),
         2,
     )
-    default_cpm = float(entries[0].get("estimated_cpm_brl", 1.25)) if entries else 1.25
-    projected_50k_brl = round(50.0 * default_cpm, 2)
+    default_cpm = float(entries[0].get("estimated_cpm_brl", cpm_brl)) if entries else cpm_brl
+    projected_50k_brl = round(min(max_payout_per_video, 50.0 * default_cpm), 2)
 
     raw_approvals = store.list_pending_approvals()
     pending_approvals: list[dict[str, Any]] = []
@@ -207,17 +220,33 @@ def _collect_status_payload(cfg: AppConfig, store: StateStore) -> dict[str, Any]
     credit_limit = max(1, int(cfg.real_oficial_daily_credit_limit))
     credit_pct = min(100.0, round((credit_today / credit_limit) * 100.0, 1))
 
-    campaign_cfg = cfg.campaign.get("campaign", {}) if isinstance(cfg.campaign, dict) else {}
-    scaling_cfg = campaign_cfg.get("scaling_5_days", {}) if isinstance(campaign_cfg, dict) else {}
-    rules_cfg = campaign_cfg.get("rules", {}) if isinstance(campaign_cfg, dict) else {}
-
     campaign_url = campaign_cfg.get("campaign_url") or (
         f"https://app.realoficial.com.br/c/{cfg.real_oficial_campaign_slug}"
         f"?ro_vid={cfg.real_oficial_ref_vid}"
     ) or DEFAULT_CAMPAIGN_URL
-    daily_shorts_target = int(scaling_cfg.get("youtube_shorts_per_day", 4))
-    preferred_times = scaling_cfg.get("preferred_times_brt", ["10:00", "14:00", "18:00", "21:30"])
-    required_hashtags = rules_cfg.get("required_hashtags", ["#GTA6", "#GTAVI", "#Shorts"])
+
+    multi_channel_summary: dict[str, Any] = {}
+    daily_shorts_target = 60
+    try:
+        from gta6_agents.orchestrator.multi_channel import MultiChannelCoordinator
+
+        mc = MultiChannelCoordinator(cfg, store)
+        multi_channel_summary = mc.get_daily_quota_summary()
+        daily_shorts_target = int(mc.global_scaling.total_daily_videos or 60)
+    except Exception:
+        pass
+
+    tri_engine_summary: dict[str, Any] = {}
+    try:
+        from gta6_agents.orchestrator.tri_engine_pool import TriEnginePool
+
+        pool = TriEnginePool(cfg, store)
+        tri_engine_summary = pool.get_pool_status()
+    except Exception:
+        pass
+
+    preferred_times = ["19:00-00:00 (Horário Nobre BR)", "22:30-22:57 (Turbo Skorpion)"]
+    required_hashtags = rules_cfg.get("required_hashtags", ["#launchdayonYT"])
 
     agents = _build_agents_swarm(
         cfg=cfg,
@@ -260,6 +289,8 @@ def _collect_status_payload(cfg: AppConfig, store: StateStore) -> dict[str, Any]
             "enabled": cfg.real_oficial_enabled,
             "slug": cfg.real_oficial_campaign_slug,
             "campaign_url": campaign_url,
+            "authorized_live_url": "https://www.youtube.com/watch?v=KY4DWumZffg",
+            "valid_platforms": campaign_cfg.get("valid_platforms", ["instagram_reels", "tiktok"]),
             "daily_shorts_target": daily_shorts_target,
             "shorts_today": shorts_today,
             "preferred_times_brt": preferred_times,
@@ -268,6 +299,8 @@ def _collect_status_payload(cfg: AppConfig, store: StateStore) -> dict[str, Any]
             "estimated_earnings_brl": estimated_earnings_brl,
             "projected_50k_views_brl": projected_50k_brl,
         },
+        "multi_channel": multi_channel_summary,
+        "tri_engine_pool": tri_engine_summary,
         "agents": agents,
         "publications": publications,
         "championship_entries": entries,

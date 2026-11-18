@@ -76,57 +76,42 @@ class AnalyticsLearningAgent:
             if isinstance(self.config.campaign, dict)
             else {}
         )
-        scaling_cfg = (
-            campaign_cfg.get("scaling_5_days", {})
-            if isinstance(campaign_cfg, dict)
-            else {}
+        daily_target = 60
+        campaign_posts_count = (
+            publications_by_platform.get("instagram_reels", 0)
+            + publications_by_platform.get("tiktok", 0)
         )
-        daily_target = int(scaling_cfg.get("youtube_shorts_per_day", 4))
-        yt_count = publications_by_platform.get("youtube_shorts", 0)
 
         if self.config.real_oficial_enabled:
-            if yt_count < daily_target:
+            if campaign_posts_count < daily_target:
                 recs.append(
-                    f"Prioritize YouTube Shorts cadence ({yt_count}/{daily_target} posted so far) "
-                    f"at BRT peak windows (10:00, 14:00, 18:00, 21:30) for '{self.config.real_oficial_campaign_slug}'."
+                    f"Acelerar cadência de cortes ao vivo no TikTok + Instagram Reels ({campaign_posts_count}/{daily_target} hoje) "
+                    f"no horário nobre BR (19:00-00:00 e turbo Skorpion 22:30-22:57) para '{self.config.real_oficial_campaign_slug}'."
                 )
             else:
                 recs.append(
-                    f"Daily YouTube Shorts target reached ({yt_count}/{daily_target}); "
-                    f"maintain hook retention in first 2.0s to grow validated views ({validated_views:,} views / R$ {estimated_earnings_brl:.2f})."
+                    f"Meta diária atingida ({campaign_posts_count}/{daily_target}); "
+                    f"manter retenção nos primeiros 2.0s para passar de 5.000 views/vídeo ({validated_views:,} views / R$ {estimated_earnings_brl:.2f})."
                 )
-
-        core_pillars = [
-            ContentPillar.OFFICIAL_NEWS.value,
-            ContentPillar.TIPS_TUTORIALS.value,
-            ContentPillar.GAMEPLAY_CLIPS.value,
-            ContentPillar.SPOTLIGHTS.value,
-            ContentPillar.COUNTDOWN_RECAP.value,
-        ]
-        missing_pillars = [p for p in core_pillars if pillar_distribution.get(p, 0) == 0]
-        if missing_pillars:
-            recs.append(
-                f"Diversify upcoming slots with underrepresented pillars: {', '.join(missing_pillars[:3])}."
-            )
 
         if pending_count > 0:
             recs.append(
-                f"Review {pending_count} pending item(s) via Telegram (/approve <plan_id> or /reject <plan_id>) or Mission Control."
+                f"Revisar {pending_count} item(ns) pendente(s) no Telegram (/approve <plan_id> ou /reject <plan_id>) — ex: validação visual anti-Samira Close."
             )
 
         credit_limit = max(1, self.config.real_oficial_daily_credit_limit)
         if credits_today >= int(credit_limit * 0.8):
             recs.append(
-                f"Credit guard alert: {credits_today}/{credit_limit} Real Oficial credits used today; stick to zero-credit local FFmpeg pipeline."
+                f"Alerta de créditos: {credits_today}/{credit_limit} créditos Real Oficial usados hoje; manter pipeline local FFmpeg 100% gratuito."
             )
 
         if total_entries == 0 and self.config.real_oficial_enabled:
             recs.append(
-                "No Real Oficial championship entries recorded yet; ensure YouTube Shorts uploads complete and register in 'gta-vi-youtube'."
+                "Nenhuma entrada registrada ainda na campanha; registre o link imediatamente após postar no TikTok/Instagram Reels (só contam views pós-registro!)."
             )
 
         if not recs:
-            recs.append("Pipeline healthy and balanced across platforms and pillars; continue autonomous schedule.")
+            recs.append("Pipeline saudável nos 5 canais PT-BR e 3 IAs; manter escala autônoma.")
 
         return recs
 
@@ -157,6 +142,16 @@ class AnalyticsLearningAgent:
 
         pillar_distribution = dict(sorted(combined_pillars.items(), key=lambda kv: (-kv[1], kv[0])))
 
+        campaign_cfg = (
+            self.config.campaign.get("campaign", {})
+            if isinstance(self.config.campaign, dict)
+            else {}
+        )
+        rewards_cfg = campaign_cfg.get("rewards", {}) if isinstance(campaign_cfg, dict) else {}
+        default_cpm = float(rewards_cfg.get("cpm_brl_per_1k_views", 4.00))
+        min_views = int(rewards_cfg.get("min_views_threshold_per_video", 5000))
+        max_per_video = float(rewards_cfg.get("max_payout_brl_per_video", 400.00))
+
         entry_status_counter: Counter[str] = Counter()
         validated_views = 0
         estimated_earnings_raw = 0.0
@@ -165,13 +160,14 @@ class AnalyticsLearningAgent:
         for entry in entries:
             entry_status_counter[str(entry.get("status") or "unknown")] += 1
             views = int(entry.get("validated_views") or 0)
-            cpm = float(entry.get("estimated_cpm_brl") or 1.25)
-            validated_views += views
-            estimated_earnings_raw += (views / 1000.0) * cpm
+            cpm = float(entry.get("estimated_cpm_brl") or default_cpm)
+            if views >= min_views:
+                validated_views += views
+                estimated_earnings_raw += min(max_per_video, (views / 1000.0) * cpm)
             cpm_values.append(cpm)
 
-        estimated_earnings_brl = round(estimated_earnings_raw, 2)
-        avg_cpm_brl = round(sum(cpm_values) / len(cpm_values), 2) if cpm_values else 1.25
+        estimated_earnings_brl = round(min(20000.0, estimated_earnings_raw), 2)
+        avg_cpm_brl = round(sum(cpm_values) / len(cpm_values), 2) if cpm_values else default_cpm
 
         recommendations = self._build_recommendations(
             pillar_distribution=pillar_distribution,

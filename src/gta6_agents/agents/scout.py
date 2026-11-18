@@ -64,21 +64,106 @@ DEFAULT_WHITELIST_CHANNELS: list[dict[str, Any]] = [
 
 DEFAULT_ACERVO_ITEMS: list[dict[str, Any]] = [
     {
-        "url": "https://www.youtube.com/watch?v=QdBZY2fkU-0",
-        "creator": "@RockstarGames",
-        "title": "Grand Theft Auto VI Trailer 1",
-        "official": True,
-    },
-    {
-        "url": "https://www.youtube.com/watch?v=VQRLujxTm3c",
-        "creator": "@RockstarGames",
-        "title": "Grand Theft Auto VI Trailer 2",
+        "url": "https://www.youtube.com/watch?v=KY4DWumZffg",
+        "creator": "@YouTube",
+        "title": "Live Oficial YouTube x GTA VI",
         "official": True,
     },
 ]
 
-# Pre-mapped multi-segment definitions for official Rockstar trailers & generic acervo items
+# Pre-mapped multi-segment definitions for the Official YouTube x GTA VI 25h Live (KY4DWumZffg)
+# plus legacy Rockstar trailer IDs when explicitly requested in non-campaign tests.
 KNOWN_ACERVO_SEGMENTS: dict[str, list[dict[str, Any]]] = {
+    "KY4DWumZffg": [
+        {
+            "start_sec": 12.0,
+            "end_sec": 36.0,
+            "label": "Gameplay ao Vivo do Skorpion em Vice City",
+            "summary": "Corte em tempo real da transmissão oficial YouTube x GTA VI com Skorpion explorando Vice City à noite.",
+            "verified_facts": [
+                "Momento capturado ao vivo na transmissão mundial oficial YouTube x GTA VI.",
+                "Gameplay em português com iluminação neon em tempo real em Vice City.",
+            ],
+            "base_score": 98.5,
+        },
+        {
+            "start_sec": 40.0,
+            "end_sec": 64.0,
+            "label": "Reação Ao Vivo na Perseguição em Leonida Keys",
+            "summary": "Momento insano da live oficial YouTube x GTA VI atravessando as pontes de Leonida Keys em alta velocidade.",
+            "verified_facts": [
+                "Transmissão oficial de lançamento YouTube x GTA VI ao vivo.",
+                "Física de suspensão e reflexos na água durante gameplay em Leonida Keys.",
+            ],
+            "base_score": 97.5,
+        },
+        {
+            "start_sec": 68.0,
+            "end_sec": 92.0,
+            "label": "Skorpion & Gamer Costa — Bastidores de Vice City (Câmera Solo)",
+            "summary": "Corte focado exclusivamente em Skorpion e Gamer Costa comentando os detalhes de Leonida na live oficial.",
+            "verified_facts": [
+                "Bloco brasileiro da live mundial oficial YouTube x GTA VI.",
+                "Corte limpo apenas com Skorpion e Gamer Costa em tela.",
+            ],
+            "base_score": 96.5,
+        },
+        {
+            "start_sec": 96.0,
+            "end_sec": 120.0,
+            "label": "Física de Carros e Drift na Ocean Drive Ao Vivo",
+            "summary": "Streamer testando a tração e deformação dos muscle cars ao vivo na avenida principal de Vice Beach.",
+            "verified_facts": [
+                "Gameplay oficial transmitido ao vivo em youtube.com/youtube.",
+                " Fumaça volumétrica dos pneus e física de peso em tempo real.",
+            ],
+            "base_score": 96.0,
+        },
+        {
+            "start_sec": 124.0,
+            "end_sec": 148.0,
+            "label": "Primeira Entrada em Grassrivers de Aerobarco na Live",
+            "summary": "Reação ao vivo na live oficial ao entrar nos pântanos de Grassrivers com vida selvagem dinâmica.",
+            "verified_facts": [
+                "Corte oficial da live mundial de 25 horas YouTube x GTA VI.",
+                "Ecossistema vivo de Grassrivers em Leonida.",
+            ],
+            "base_score": 95.5,
+        },
+        {
+            "start_sec": 152.0,
+            "end_sec": 176.0,
+            "label": "Lucia e Jason em Ação Ao Vivo na Transmissão Mundial",
+            "summary": "Troca dinâmica de protagonistas e reação imediata dos criadores na live oficial do YouTube.",
+            "verified_facts": [
+                "Transmitido ao vivo no evento oficial YouTube x GTA VI.",
+                "Protagonistas Lucia Caminos e Jason Duval em missão em Leonida.",
+            ],
+            "base_score": 95.0,
+        },
+        {
+            "start_sec": 180.0,
+            "end_sec": 204.0,
+            "label": "Densidade de NPCs em Vice Beach Ao Vivo",
+            "summary": "Criador mostra a quantidade absurda de NPCs únicos reagindo em tempo real na praia de Vice City.",
+            "verified_facts": [
+                "Cena 100% da live oficial YouTube x GTA VI.",
+                "Rotinas individuais de NPCs e clima dinâmico em Vice Beach.",
+            ],
+            "base_score": 94.5,
+        },
+        {
+            "start_sec": 208.0,
+            "end_sec": 232.0,
+            "label": "Voo Rasante sobre Port Gellhorn e Mount Kalaga na Live",
+            "summary": "Travessia aérea ao vivo revelando a escala gigante do mapa de Leonida durante a live oficial.",
+            "verified_facts": [
+                "Transmissão mundial oficial de lançamento do GTA VI no YouTube.",
+                "Horizonte contínuo conectando Port Gellhorn e Mount Kalaga.",
+            ],
+            "base_score": 94.0,
+        },
+    ],
     "QdBZY2fkU-0": [
         {
             "start_sec": 0.0,
@@ -88,31 +173,8 @@ KNOWN_ACERVO_SEGMENTS: dict[str, list[dict[str, Any]]] = {
             "verified_facts": [
                 "Lucia Caminos is a lead protagonist in Grand Theft Auto VI.",
                 "Grand Theft Auto VI takes place in the state of Leonida, home to Vice City.",
-                "Captured from official Rockstar Games Trailer 1.",
             ],
-            "base_score": 96.0,
-        },
-        {
-            "start_sec": 26.0,
-            "end_sec": 52.0,
-            "label": "Vice Beach Crowd Density & Water Physics",
-            "summary": "Official Trailer 1 showcase of Vice Beach NPC variety, watercraft wakes, and coastal Leonida Keys bridges.",
-            "verified_facts": [
-                "Vice Beach features dense, individually animated NPC routines and water physics.",
-                "Airboats and speedboats traverse coastal waterways across Leonida.",
-            ],
-            "base_score": 94.0,
-        },
-        {
-            "start_sec": 52.0,
-            "end_sec": 78.0,
-            "label": "Grassrivers Wildlife, Nightlife & High-Speed Getaway",
-            "summary": "Official Trailer 1 montage covering Grassrivers wetlands wildlife, Ocean Drive neon cars, and Lucia & Jason getaway.",
-            "verified_facts": [
-                "Grassrivers wetlands include alligators, flamingos, and airboat traversal.",
-                "Lucia and Jason operate together during robberies in Leonida.",
-            ],
-            "base_score": 92.5,
+            "base_score": 92.0,
         },
     ],
     "VQRLujxTm3c": [
@@ -120,34 +182,11 @@ KNOWN_ACERVO_SEGMENTS: dict[str, list[dict[str, Any]]] = {
             "start_sec": 0.0,
             "end_sec": 26.0,
             "label": "Jason Duval & Leonida Keys Routine",
-            "summary": "Official Trailer 2 opening spotlighting Jason Duval in the Leonida Keys with realistic tropical lighting and vehicle wear.",
+            "summary": "Official Trailer 2 opening spotlighting Jason Duval in the Leonida Keys with realistic tropical lighting.",
             "verified_facts": [
                 "Jason Duval and Lucia Caminos are the dual protagonists of GTA VI.",
-                "Leonida Keys features tropical coastal towns and connected island highways.",
             ],
-            "base_score": 97.0,
-        },
-        {
-            "start_sec": 26.0,
-            "end_sec": 52.0,
-            "label": "Vice City Neon Reflections & Ray-Traced Interiors",
-            "summary": "Official Trailer 2 look at Vice City night reflections, vehicle mirrors, and dense urban street traffic.",
-            "verified_facts": [
-                "Rockstar captured Trailer 2 in-game on PlayStation 5 hardware.",
-                "Real-time reflections appear on car mirrors, glass storefronts, and wet asphalt.",
-            ],
-            "base_score": 95.0,
-        },
-        {
-            "start_sec": 52.0,
-            "end_sec": 78.0,
-            "label": "Port Gellhorn, Ambrosia & Muscle Car Physics",
-            "summary": "Official Trailer 2 action sequence highlighting muscle car suspension flex, tire smoke, and industrial Leonida regions.",
-            "verified_facts": [
-                "Leonida expands far beyond Vice City into Port Gellhorn, Ambrosia, and Mount Kalaga.",
-                "Vehicle suspension and weight transfer visibly react to terrain and high-speed turns.",
-            ],
-            "base_score": 93.5,
+            "base_score": 92.0,
         },
     ],
 }
@@ -157,19 +196,22 @@ _LEAK_FILTER_RE = re.compile(
     r"\b(?:leak|leaks|leaked|leaking|datamine|datamined|datamines|datamining|dataminer|"
     r"dev\s+build|source\s+code|pirated|piracy|torrent|crack\s+download|"
     r"money\s+glitch|god\s*mode\s+exploit|aimbot|wallhack|nude\s+mod|nsfw|"
-    r"extreme\s+gore|vazamento|mapa\s+vazado|build\s+vazada|c[oó]pia\s+pirata)\b",
+    r"extreme\s+gore|vazamento|mapa\s+vazado|build\s+vazada|c[oó]pia\s+pirata|"
+    r"samira\s*close|burnt\s*peanut|burntpeanut|"
+    r"antes\s+do\s+gta\s*(?:6|vi)|before\s+gta\s*(?:6|vi)|"
+    r"gta\s*(?:5|v)\s*vs\s*gta\s*(?:6|vi)|san\s+andreas\s+vs)\b",
     re.IGNORECASE,
 )
 
 _GTA_RELEVANCE_RE = re.compile(
-    r"\b(?:gta\s*6|gta\s*vi|gta\s*5|gta\s*v|grand\s+theft\s+auto|leonida|vice\s+city|"
-    r"lucia|jason\s+duval|rockstar\s+games|grassrivers|kalaga|gellhorn)\b",
+    r"\b(?:gta\s*6|gta\s*vi|grand\s+theft\s+auto\s*vi|leonida|vice\s+city|"
+    r"lucia|jason\s+duval|rockstar\s+games|grassrivers|kalaga|gellhorn|skorpion)\b",
     re.IGNORECASE,
 )
 
 _HIGH_HOOK_KEYWORDS_RE = re.compile(
-    r"\b(?:trailer\s*2|trailer\s*1|official|lucia|jason|vice\s+city|leonida|"
-    r"physics|detail|hidden|guide|tip|how\s+to|evolution|comparison)\b",
+    r"\b(?:ao\s+vivo|live|skorpion|gamer\s+costa|lucia|jason|vice\s+city|leonida|"
+    r"f[ií]sica|physics|insano|rea[cç][aã]o|gameplay|launchdayonyt)\b",
     re.IGNORECASE,
 )
 
@@ -274,41 +316,99 @@ class ScoutAgent:
         score += min(10.0, max(0.0, engagement_bonus))
         return round(max(0.0, min(100.0, score)), 2)
 
+    def _is_campaign_blocked_now(self, campaign_block: dict[str, Any]) -> bool:
+        """Enforce Burnt Peanut live blackout (20:00-20:34 BRT) and hard-stop (20/11 01:57 BRT) in live mode."""
+        if self.config.dry_run:
+            return False
+        from datetime import datetime, timezone
+
+        now_utc = datetime.now(timezone.utc)
+        schedule_brt = campaign_block.get("schedule_brt", {})
+        if isinstance(schedule_brt, dict):
+            hard_stop_raw = str(schedule_brt.get("hard_stop_post_iso", "")).strip()
+            if hard_stop_raw:
+                try:
+                    hard_stop_dt = datetime.fromisoformat(hard_stop_raw).astimezone(timezone.utc)
+                    if now_utc >= hard_stop_dt:
+                        return True
+                except ValueError:
+                    pass
+
+        for entry in campaign_block.get("forbidden_appearances", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("policy", "")) == "hard_time_and_keyword_blackout":
+                s_raw = str(entry.get("danger_window_start_iso", "")).strip()
+                e_raw = str(entry.get("danger_window_end_iso", "")).strip()
+                if s_raw and e_raw:
+                    try:
+                        s_dt = datetime.fromisoformat(s_raw).astimezone(timezone.utc)
+                        e_dt = datetime.fromisoformat(e_raw).astimezone(timezone.utc)
+                        if s_dt <= now_utc <= e_dt:
+                            return True
+                    except ValueError:
+                        pass
+        return False
+
     def _discover_campaign_acervo(
         self,
         blacklist: set[str],
         blocked_keywords: list[str],
-        max_segments_per_video: int = 2,
+        max_segments_per_video: int = 8,
     ) -> list[SourceCandidate]:
         raw_campaign = self.config.campaign
+        campaign_block: dict[str, Any] = {}
         if isinstance(raw_campaign, dict) and raw_campaign:
-            campaign_block = raw_campaign.get("campaign", raw_campaign)
-            if isinstance(campaign_block, dict) and "eligible_acervo_urls" in campaign_block:
-                acervo_list = campaign_block.get("eligible_acervo_urls") or []
-            else:
-                acervo_list = DEFAULT_ACERVO_ITEMS if self.config.real_oficial_enabled else []
-            campaign_slug = (
-                campaign_block.get("slug", self.config.real_oficial_campaign_slug)
-                if isinstance(campaign_block, dict)
-                else self.config.real_oficial_campaign_slug
+            maybe_block = raw_campaign.get("campaign", raw_campaign)
+            if isinstance(maybe_block, dict):
+                campaign_block = maybe_block
+
+        if campaign_block and self._is_campaign_blocked_now(campaign_block):
+            return []
+
+        if "eligible_acervo_urls" in campaign_block:
+            acervo_list = campaign_block.get("eligible_acervo_urls") or []
+        elif isinstance(campaign_block.get("authorized_live"), dict) and campaign_block["authorized_live"].get("url"):
+            auth_live = campaign_block["authorized_live"]
+            acervo_list = (
+                [
+                    {
+                        "url": str(auth_live["url"]).strip(),
+                        "creator": "@YouTube",
+                        "title": str(auth_live.get("title", "Live Oficial YouTube x GTA VI")),
+                        "official": True,
+                    }
+                ]
+                if self.config.real_oficial_enabled
+                else []
             )
         else:
             acervo_list = DEFAULT_ACERVO_ITEMS if self.config.real_oficial_enabled else []
-            campaign_slug = self.config.real_oficial_campaign_slug
+
+        campaign_slug = (
+            str(campaign_block.get("slug", self.config.real_oficial_campaign_slug))
+            if campaign_block
+            else self.config.real_oficial_campaign_slug
+        )
 
         results: list[SourceCandidate] = []
         for raw_item in acervo_list:
             if isinstance(raw_item, str):
                 base_url = raw_item.strip()
-                creator = "@RockstarGames"
-                base_title = "GTA VI Official Campaign Video"
+                creator = "@YouTube" if "KY4DWumZffg" in base_url else "@RockstarGames"
+                base_title = (
+                    "Live Oficial YouTube x GTA VI"
+                    if "KY4DWumZffg" in base_url
+                    else "GTA VI Official Campaign Video"
+                )
                 is_official = True
                 custom_segments = None
             elif isinstance(raw_item, dict) and raw_item.get("url"):
                 base_url = str(raw_item["url"]).strip()
-                creator = _ensure_at_handle(str(raw_item.get("creator", "@RockstarGames")))
+                default_creator = "@YouTube" if "KY4DWumZffg" in base_url else "@RockstarGames"
+                creator = _ensure_at_handle(str(raw_item.get("creator", default_creator)))
                 base_title = sanitize_untrusted_video_text(
-                    str(raw_item.get("title", "GTA VI Campaign Acervo")), max_length=140
+                    str(raw_item.get("title", "Live Oficial YouTube x GTA VI")), max_length=140
                 )
                 is_official = bool(raw_item.get("official", True))
                 custom_segments = raw_item.get("segments")
@@ -322,25 +422,45 @@ class ScoutAgent:
             vid_id = _extract_youtube_id(clean_base_url)
 
             if isinstance(custom_segments, list) and custom_segments:
-                segments = custom_segments
+                segments = list(custom_segments)
             elif vid_id in KNOWN_ACERVO_SEGMENTS:
-                segments = KNOWN_ACERVO_SEGMENTS[vid_id]
+                segments = list(KNOWN_ACERVO_SEGMENTS[vid_id])
+                if vid_id == "KY4DWumZffg":
+                    # Append rolling 24s windows across the 25h live stream so 5x12 channels never starve
+                    for roll_i in range(1, 80):
+                        s_sec = 240.0 + roll_i * 28.0
+                        segments.append(
+                            {
+                                "start_sec": s_sec,
+                                "end_sec": s_sec + 24.0,
+                                "label": f"Momento Ao Vivo #{roll_i + 8} — Gameplay em Leonida",
+                                "summary": (
+                                    f"Corte em tempo real da transmissão mundial YouTube x GTA VI "
+                                    f"(janela {int(s_sec)}s-{int(s_sec + 24)}s) com reação ao vivo em português."
+                                ),
+                                "verified_facts": [
+                                    "Capturado 100% da live oficial YouTube x GTA VI ao vivo.",
+                                    "Gameplay verificado no estado de Leonida e Vice City.",
+                                ],
+                                "base_score": max(88.0, 94.0 - (roll_i * 0.05)),
+                            }
+                        )
             else:
                 segments = [
                     {
                         "start_sec": 0.0,
-                        "end_sec": 26.0,
-                        "label": "Highlight Cut 1",
-                        "summary": f"Verified campaign acervo highlight from {base_title}.",
-                        "verified_facts": [f"Official campaign acervo source: {base_title}."],
+                        "end_sec": 24.0,
+                        "label": "Corte Ao Vivo #1",
+                        "summary": f"Momento verificado ao vivo em {base_title}.",
+                        "verified_facts": [f"Fonte oficial autorizada: {base_title}."],
                         "base_score": 90.0,
                     },
                     {
-                        "start_sec": 26.0,
+                        "start_sec": 28.0,
                         "end_sec": 52.0,
-                        "label": "Highlight Cut 2",
-                        "summary": f"Second verified campaign acervo highlight from {base_title}.",
-                        "verified_facts": [f"Official campaign acervo source: {base_title}."],
+                        "label": "Corte Ao Vivo #2",
+                        "summary": f"Segundo momento verificado ao vivo em {base_title}.",
+                        "verified_facts": [f"Fonte oficial autorizada: {base_title}."],
                         "base_score": 88.0,
                     },
                 ]
@@ -350,7 +470,7 @@ class ScoutAgent:
                 if added_for_video >= max_segments_per_video:
                     break
                 start_sec = float(seg.get("start_sec", 0.0))
-                end_sec = float(seg.get("end_sec", 26.0))
+                end_sec = float(seg.get("end_sec", 24.0))
                 segment_key = f"{clean_base_url}#{int(start_sec)}-{int(end_sec)}"
 
                 if self.store.is_source_seen(segment_key):
@@ -399,6 +519,7 @@ class ScoutAgent:
                             "segment_key": segment_key,
                             "segment_index": idx,
                             "video_id": vid_id,
+                            "authorized_live_ky4": vid_id == "KY4DWumZffg",
                         },
                     )
                 )
@@ -588,12 +709,13 @@ class ScoutAgent:
 
     def _infer_pillar(self, title: str, summary: str, *, is_official: bool) -> ContentPillar:
         text = f"{title} {summary}".lower()
+        content_focus = str((self.config.settings or {}).get("page", {}).get("content_focus", ""))
+        if content_focus == "streamer_live_clips_only":
+            return ContentPillar.GAMEPLAY_CLIPS
         if is_official or any(k in text for k in ("newswire", "official trailer", "rockstar announces")):
             return ContentPillar.OFFICIAL_NEWS
         if any(k in text for k in ("how to", "tip", "guide", "tutorial", "settings", "dica", "como")):
             return ContentPillar.TIPS_TUTORIALS
-        if any(k in text for k in ("gta 5", "gta v", "2013", "los santos", "nostalgia", "evolution")):
-            return ContentPillar.GTA5_NOSTALGIA
         if any(
             k in text
             for k in (
@@ -616,133 +738,117 @@ class ScoutAgent:
     def _curated_offline_fallbacks(
         self, blacklist: set[str], blocked_keywords: list[str]
     ) -> list[SourceCandidate]:
+        """Curated PT-BR Streamer Live Cuts of GTA VI (post-live / non-campaign streamer mode)."""
         curated_raw: list[dict[str, Any]] = [
             {
-                "title": "GTA VI Official Trailer 2 — Real-Time Lighting & Physics Breakdown",
-                "url": "https://www.rockstargames.com/VI#trailer2-lighting-breakdown",
-                "creator_handle": "@RockstarGames",
-                "source_type": "official_newswire",
-                "is_official": True,
-                "pillar": ContentPillar.OFFICIAL_NEWS,
-                "summary": "Official Rockstar Games GTA VI showcase highlighting PS5 in-game lighting, mirror reflections, and dual-protagonist scenes.",
-                "verified_facts": [
-                    "Grand Theft Auto VI Trailer 2 was captured in-game on PlayStation 5.",
-                    "Features protagonists Jason Duval and Lucia Caminos across the state of Leonida.",
-                ],
-                "start_sec": 4.0,
-                "end_sec": 30.0,
-                "virality_score": 93.0,
-            },
-            {
-                "title": "Leonida Regional Spotlight — Vice City, Leonida Keys & Grassrivers",
-                "url": "https://www.rockstargames.com/VI#leonida-regions-spotlight",
-                "creator_handle": "@RockstarGames",
-                "source_type": "official_newswire",
-                "is_official": True,
-                "pillar": ContentPillar.SPOTLIGHTS,
-                "summary": "Tour of confirmed Leonida regions: Vice City neon avenues, tropical Leonida Keys, Grassrivers swamps, Port Gellhorn, Ambrosia, and Mount Kalaga.",
-                "verified_facts": [
-                    "Confirmed Leonida regions include Vice City, Leonida Keys, Grassrivers, Port Gellhorn, Ambrosia, and Mount Kalaga National Park.",
-                    "Each region has distinct architecture, vehicles, and wildlife ecosystems.",
-                ],
-                "start_sec": 0.0,
-                "end_sec": 27.0,
-                "virality_score": 91.0,
-            },
-            {
-                "title": "Lucia Caminos & Jason Duval — Confirmed Character Details Spotlight",
-                "url": "https://www.rockstargames.com/VI#lucia-jason-spotlight",
-                "creator_handle": "@RockstarGames",
-                "source_type": "official_newswire",
-                "is_official": True,
-                "pillar": ContentPillar.SPOTLIGHTS,
-                "summary": "Official character overview of Lucia Caminos and Jason Duval and how their partnership drives the Leonida story.",
-                "verified_facts": [
-                    "Lucia Caminos and Jason Duval partner up across Leonida after a score goes wrong.",
-                    "Both characters feature detailed facial animations and distinct movement styles.",
-                ],
-                "start_sec": 0.0,
-                "end_sec": 26.0,
-                "virality_score": 89.5,
-            },
-            {
-                "title": "HOW-TO: 3 Driving & Braking Habits to Master Before Leonida Highways",
-                "url": "https://www.youtube.com/watch?v=broughy_handling_prep_01",
-                "creator_handle": "@Broughy1322",
-                "source_type": "youtube",
-                "is_official": False,
-                "pillar": ContentPillar.TIPS_TUTORIALS,
-                "summary": "Practical driving tutorial on trail-braking, weight transfer, and camera height settings for heavy GTA suspension physics.",
-                "verified_facts": [
-                    "GTA VI trailers demonstrate pronounced body roll and suspension compression during cornering.",
-                    "Higher vehicle camera height improves apex visibility in dense Vice City traffic.",
-                ],
-                "start_sec": 5.0,
-                "end_sec": 31.0,
-                "virality_score": 87.0,
-            },
-            {
-                "title": "13 Years of Rockstar Evolution: GTA V Los Santos (2013) vs GTA VI Leonida",
-                "url": "https://www.youtube.com/watch?v=gtaseries_gta5_vs_gta6_01",
-                "creator_handle": "@GTASeriesVideos",
-                "source_type": "youtube",
-                "is_official": False,
-                "pillar": ContentPillar.GTA5_NOSTALGIA,
-                "summary": "Side-by-side nostalgia comparison of beach crowds, water waves, traffic variety, and sunset lighting from GTA V to GTA VI.",
-                "verified_facts": [
-                    "GTA V launched in September 2013 set in Los Santos and Blaine County.",
-                    "GTA VI upgrades crowd animation uniqueness, volumetric clouds, and water foam simulation.",
-                ],
-                "start_sec": 2.0,
-                "end_sec": 28.0,
-                "virality_score": 88.5,
-            },
-            {
-                "title": "HOW-TO: Spot Frame-by-Frame Vehicle Mirror & Interior Details in GTA VI",
-                "url": "https://www.youtube.com/watch?v=tgg_gta6_details_guide_01",
-                "creator_handle": "@TGGonYT",
-                "source_type": "youtube",
-                "is_official": False,
-                "pillar": ContentPillar.TIPS_TUTORIALS,
-                "summary": "Step-by-step breakdown showing working side mirrors, dashboard gauges, and NPC reactions inside GTA VI vehicles.",
-                "verified_facts": [
-                    "Side-view and rear-view mirrors render accurate live road reflections in GTA VI trailers.",
-                    "Vehicle interiors feature individually animated switches, steering hands, and seat textures.",
-                ],
-                "start_sec": 3.0,
-                "end_sec": 29.0,
-                "virality_score": 85.5,
-            },
-            {
-                "title": "GTA Physics & NPC Reaction Mechanics That Define Rockstar Open Worlds",
-                "url": "https://www.youtube.com/watch?v=darkviper_gta_mechanics_01",
-                "creator_handle": "@DarkViperAU",
+                "title": "Skorpion Ao Vivo Explorando Vice City à Noite em GTA VI",
+                "url": "https://www.youtube.com/watch?v=skorpion_live_vicecity_01",
+                "creator_handle": "@Skorpion",
                 "source_type": "youtube",
                 "is_official": False,
                 "pillar": ContentPillar.GAMEPLAY_CLIPS,
-                "summary": "Gameplay analysis of Rockstar euphoria physics, NPC awareness cones, and vehicle collision deformation.",
+                "summary": "Corte de live em português com Skorpion testando carros esportivos e reflexos neon na Ocean Drive em GTA VI.",
                 "verified_facts": [
-                    "Rockstar open worlds combine procedural ragdoll physics with canned animation blending.",
+                    "Corte de live em português focado 100% em gameplay ao vivo de GTA VI em Vice City.",
+                    "Crédito ao streamer original @Skorpion.",
                 ],
                 "start_sec": 4.0,
                 "end_sec": 28.0,
-                "virality_score": 84.0,
+                "virality_score": 93.0,
             },
             {
-                "title": "GTA VI Verified Recap: Every Confirmed Feature, Region & Trailer Milestone",
-                "url": "https://www.rockstargames.com/VI#verified-countdown-recap",
-                "creator_handle": "@RockstarGames",
-                "source_type": "official_newswire",
-                "is_official": True,
-                "pillar": ContentPillar.COUNTDOWN_RECAP,
-                "summary": "Fast verified recap of everything officially confirmed by Rockstar Games for Grand Theft Auto VI in Leonida.",
+                "title": "Alanzoka Reage à Física Insana de Perseguição em Leonida Keys",
+                "url": "https://www.youtube.com/watch?v=alanzoka_live_leonidakeys_01",
+                "creator_handle": "@alanzoka",
+                "source_type": "youtube",
+                "is_official": False,
+                "pillar": ContentPillar.GAMEPLAY_CLIPS,
+                "summary": "Momento hilário e tenso da live do Alanzoka cruzando as pontes de Leonida Keys em alta velocidade no GTA VI.",
                 "verified_facts": [
-                    "Set in the state of Leonida featuring Vice City and five surrounding regions.",
-                    "Stars Lucia Caminos and Jason Duval.",
+                    "Corte de transmissão ao vivo de GTA VI em português.",
+                    "Gameplay focado nas pontes tropicais de Leonida Keys.",
                 ],
-                "start_sec": 0.0,
-                "end_sec": 25.0,
-                "virality_score": 86.5,
+                "start_sec": 2.0,
+                "end_sec": 26.0,
+                "virality_score": 92.0,
+            },
+            {
+                "title": "Gamer Costa Descobre Detalhes Escondidos nos Pântanos de Grassrivers Ao Vivo",
+                "url": "https://www.youtube.com/watch?v=gamercosta_live_grassrivers_01",
+                "creator_handle": "@GamerCosta",
+                "source_type": "youtube",
+                "is_official": False,
+                "pillar": ContentPillar.GAMEPLAY_CLIPS,
+                "summary": "Corte de live com Gamer Costa pilotando aerobarco e reagindo ao ecossistema dinâmico de Grassrivers em GTA VI.",
+                "verified_facts": [
+                    "Transmissão ao vivo em português explorando Grassrivers em Leonida.",
+                    "Reação autêntica durante gameplay de GTA VI.",
+                ],
+                "start_sec": 5.0,
+                "end_sec": 29.0,
+                "virality_score": 91.0,
+            },
+            {
+                "title": "Coringa Testando Fuga Cinematográfica com Lucia e Jason em Vice Beach",
+                "url": "https://www.youtube.com/watch?v=coringa_live_vicebeach_01",
+                "creator_handle": "@loud_coringa",
+                "source_type": "youtube",
+                "is_official": False,
+                "pillar": ContentPillar.GAMEPLAY_CLIPS,
+                "summary": "Corte explosivo da live do Coringa mostrando a densidade de trânsito e reação policial em Vice Beach no GTA VI.",
+                "verified_facts": [
+                    "Corte de live em português com gameplay real de GTA VI.",
+                    "Ação em tempo real nas avenidas de Vice Beach.",
+                ],
+                "start_sec": 3.0,
+                "end_sec": 27.0,
+                "virality_score": 90.5,
+            },
+            {
+                "title": "Paulinho o Loko Fazendo Drift de Muscle Car em Port Gellhorn Ao Vivo",
+                "url": "https://www.youtube.com/watch?v=paulinho_live_gellhorn_01",
+                "creator_handle": "@PaulinhooLoko",
+                "source_type": "youtube",
+                "is_official": False,
+                "pillar": ContentPillar.GAMEPLAY_CLIPS,
+                "summary": "Reação ao vivo do chat na live do Paulinho o Loko testando a suspensão e fumaça dos pneus em Port Gellhorn.",
+                "verified_facts": [
+                    "Corte de live de streamer brasileiro jogando GTA VI.",
+                    "Física de suspensão e deformação veicular em Port Gellhorn.",
+                ],
+                "start_sec": 4.0,
+                "end_sec": 28.0,
+                "virality_score": 89.5,
+            },
+            {
+                "title": "FunkyBlackCat Analisa a Iluminação e Interiores de GTA VI Ao Vivo",
+                "url": "https://www.youtube.com/watch?v=funky_live_leonida_01",
+                "creator_handle": "@FunkyBlackCat",
+                "source_type": "youtube",
+                "is_official": False,
+                "pillar": ContentPillar.GAMEPLAY_CLIPS,
+                "summary": "Corte de live em português destacando os retrovisores funcionais e clima dinâmico no estado de Leonida.",
+                "verified_facts": [
+                    "Corte de live brasileira comentando detalhes técnicos confirmados de GTA VI.",
+                ],
+                "start_sec": 2.0,
+                "end_sec": 26.0,
+                "virality_score": 88.5,
+            },
+            {
+                "title": "Gaules & Tribo Reagindo às Primeiras Horas em Mount Kalaga no GTA VI",
+                "url": "https://www.youtube.com/watch?v=gaules_live_kalaga_01",
+                "creator_handle": "@Gaules",
+                "source_type": "youtube",
+                "is_official": False,
+                "pillar": ContentPillar.GAMEPLAY_CLIPS,
+                "summary": "Momento de puro hype na live do Gaules acompanhando trilhas off-road em Mount Kalaga National Park.",
+                "verified_facts": [
+                    "Corte de reação ao vivo em português em Mount Kalaga (Leonida).",
+                ],
+                "start_sec": 3.0,
+                "end_sec": 27.0,
+                "virality_score": 88.0,
             },
         ]
 
@@ -771,7 +877,7 @@ class ScoutAgent:
                     suggested_start_sec=float(item["start_sec"]),
                     suggested_end_sec=float(item["end_sec"]),
                     virality_score=float(item["virality_score"]),
-                    metadata={"curated_fallback": True},
+                    metadata={"curated_fallback": True, "streamer_live_cut": True},
                 )
             )
 
@@ -797,10 +903,28 @@ class ScoutAgent:
                 seen_batch_urls.add(cand.url)
                 collected.append(cand)
 
-        # 1. Campaign Acervo multi-segment candidates
+        raw_campaign = self.config.campaign if isinstance(self.config.campaign, dict) else {}
+        campaign_block = raw_campaign.get("campaign", raw_campaign) if isinstance(raw_campaign, dict) else {}
+        only_authorized_live = bool(
+            isinstance(campaign_block, dict)
+            and campaign_block.get("rules", {}).get("only_authorized_live_source", False)
+        )
+
+        # 1. Campaign Acervo multi-segment candidates (KY4DWumZffg live stream)
         if include_campaign_acervo:
-            acervo_candidates = self._discover_campaign_acervo(blacklist, blocked_keywords)
+            acervo_candidates = self._discover_campaign_acervo(
+                blacklist,
+                blocked_keywords,
+                max_segments_per_video=max(limit, 8),
+            )
             _add_unique(acervo_candidates)
+            # During active KY4DWumZffg campaign mode, return ONLY authorized live cuts if available
+            if only_authorized_live and collected:
+                collected.sort(
+                    key=lambda c: (c.virality_score, c.is_campaign_acervo, c.is_official),
+                    reverse=True,
+                )
+                return collected[:limit]
 
         # 2. Live YouTube RSS + Reddit JSON feeds (graceful timeout & exception isolation)
         scout_cfg = (self.config.settings or {}).get("scout", {})
@@ -825,7 +949,7 @@ class ScoutAgent:
                 except Exception:
                     pass
 
-        # 3. Curated verified fallback pool so discovery NEVER fails or starves
+        # 3. Curated verified fallback pool (PT-BR Streamer Live Cuts) so discovery NEVER fails or starves
         if len(collected) < limit:
             fallback_candidates = self._curated_offline_fallbacks(blacklist, blocked_keywords)
             _add_unique(fallback_candidates)

@@ -7,6 +7,11 @@ import re
 from difflib import SequenceMatcher
 from typing import Iterable
 
+from gta6_agents.agents.live_campaign_ky4 import (
+    AUTHORIZED_LIVE_VIDEO_ID,
+    MANDATORY_CAPTION_PHRASE,
+    MANDATORY_ONLY_HASHTAG,
+)
 from gta6_agents.config import AppConfig
 from gta6_agents.models import (
     ApprovalStatus,
@@ -17,6 +22,11 @@ from gta6_agents.models import (
     Platform,
 )
 from gta6_agents.storage import StateStore
+
+VALID_CAMPAIGN_PLATFORMS: frozenset[Platform] = frozenset(
+    {Platform.INSTAGRAM_REELS, Platform.TIKTOK}
+)
+FORBIDDEN_TRAILER_VIDEO_IDS: tuple[str, ...] = ("QdBZY2fkU-0", "VQRLujxTm3c")
 
 DEFAULT_BLACKLIST_HANDLES: set[str] = {
     "gta6leakshub",
@@ -124,7 +134,8 @@ _ROCKSTAR_IMPERSONATION_RE = re.compile(
     r"i\s+work\s+at\s+rockstar|we\s+are\s+rockstar\s+games|"
     r"official\s+rockstar\s+(?:games\s+)?(?:account|page|channel)\s+here|"
     r"n[oó]s\s+da\s+rockstar|aqui\s+na\s+rockstar|somos\s+a\s+rockstar|"
-    r"nosso\s+est[uú]dio\s+rockstar)\b",
+    r"nosso\s+est[uú]dio\s+rockstar|somos\s+o\s+youtube\s+oficial|"
+    r"canal\s+oficial\s+d[ao]\s+rockstar)\b",
     re.IGNORECASE,
 )
 
@@ -141,8 +152,34 @@ _OUTSIDE_PILLARS_DRAMA_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Real Oficial KY4DWumZffg 13-Rule Campaign Patterns
+_FORBIDDEN_CAMPAIGN_PEOPLE_RE = re.compile(
+    r"\b(?:samira\s+close|the\s+burnt\s+peanut|burnt\s*peanut)\b",
+    re.IGNORECASE,
+)
+
+_OLD_GTA_COMPARISON_RE = re.compile(
+    r"\b(?:gta\s*(?:v|5|iv|4|iii|3)|san\s+andreas|los\s+santos|"
+    r"antes\s+d[eo]\s+gta\s*(?:6|vi)|before\s+gta\s*(?:6|vi)|"
+    r"tivemos\s+isso\s+antes|comparando\s+com\s+(?:o\s+)?gta|"
+    r"compara[cç][aã]o\s+com\s+(?:o\s+)?gta)\b",
+    re.IGNORECASE,
+)
+
+_NEGATIVE_MOCKERY_RE = re.compile(
+    r"\b(?:jogo\s+lixo|que\s+lixo|flopou|vai\s+flopar|horr[ií]vel|"
+    r"decep[cç][aã]o|decepcionante|downgrade|todo\s+bugado|"
+    r"cheio\s+de\s+bug|muito\s+bugado)\b",
+    re.IGNORECASE,
+)
+
+_MANDATORY_LIVE_PHRASE_RE = re.compile(
+    r"Assista ao vivo em (?i:youtube\.com/youtube)(?=$|\s|[.,!?;:])"
+)
+
 _CREDIT_TAG_RE = re.compile(r"🎥\s*@[A-Za-z0-9_.-]+")
 _HASHTAG_RE = re.compile(r"(?:^|\s)#[A-Za-z0-9_À-ÿ]+")
+_INLINE_HASHTAG_RE = re.compile(r"(?:^|(?<=\s))#[A-Za-z0-9_À-ÿ]+")
 
 
 def sanitize_untrusted_video_text(text: str, max_length: int = 1500) -> str:
@@ -181,15 +218,16 @@ def _normalize_text(text: str) -> str:
 def _strip_credits_and_hashtags(text: str) -> str:
     without_credit = _CREDIT_TAG_RE.sub(" ", text)
     without_tags = _HASHTAG_RE.sub(" ", without_credit)
-    # Strip standard boilerplate fan disclaimer so different clips aren't matched on disclaimer alone
-    without_disclaimer = re.sub(
+    # Strip standard boilerplate fan disclaimer & mandatory campaign CTA so distinct hooks aren't false-matched
+    without_boilerplate = re.sub(
         r"(?:fan\s+page,?\s+not\s+affiliated\s+with\s+rockstar\s+games\.?|"
-        r"p[aá]gina\s+de\s+f[aã]s,?\s+sem\s+afilia[cç][aã]o(?:\s+oficial)?\s+com\s+a\s+rockstar\s+games\.?)",
+        r"p[aá]gina\s+de\s+f[aã]s,?\s+sem\s+afilia[cç][aã]o(?:\s+oficial)?\s+com\s+a\s+rockstar\s+games\.?|"
+        r"assista\s+ao\s+vivo\s+em\s+youtube\.com/youtube)",
         " ",
         without_tags,
         flags=re.IGNORECASE,
     )
-    return _normalize_text(without_disclaimer)
+    return _normalize_text(without_boilerplate)
 
 
 class ComplianceFactAgent:
@@ -294,9 +332,11 @@ class ComplianceFactAgent:
 
         # 1. Blacklisted creator or explicit no-repost bio flag
         creator_norm = normalize_handle(plan.source.creator_handle)
-        if not creator_norm:
+        if not creator_norm and not plan.for_real_oficial_campaign:
             reasons.append("Missing creator_handle on source candidate.")
-        elif creator_norm in blacklist or plan.source.metadata.get("blacklisted") is True:
+        elif creator_norm and (
+            creator_norm in blacklist or plan.source.metadata.get("blacklisted") is True
+        ):
             reasons.append(f"Creator @{creator_norm} is on the blacklist.")
 
         if plan.source.metadata.get("no_reposts") is True or re.search(
@@ -331,9 +371,11 @@ class ComplianceFactAgent:
             if plan.for_real_oficial_campaign:
                 campaign_compliant = False
 
-        # 5. Fake official Rockstar impersonation
+        # 5. Fake official Rockstar / YouTube impersonation
         if _ROCKSTAR_IMPERSONATION_RE.search(corpus):
-            reasons.append("Rejected: impersonates official Rockstar Games voice or account.")
+            reasons.append("Rejected: impersonates official Rockstar Games or YouTube account.")
+            if plan.for_real_oficial_campaign:
+                campaign_compliant = False
 
         # 6. Unverified speculative clickbait confirmations
         if _SPECULATIVE_CLICKBAIT_RE.search(corpus):
@@ -354,10 +396,12 @@ class ComplianceFactAgent:
         if not plan.voiceover_script.strip() and not plan.commentary_overlay.strip():
             warnings.append("Neither voiceover_script nor commentary_overlay is populated; relying on hook banner only.")
 
-        # 8. Creator credit check in every platform copy
+        # 8. Creator credit check (post-live streamer mode ONLY; Rule #10 forbids watermarks/extra tags on campaign!)
         if not bundle.copies:
             reasons.append("Rejected: CaptionBundle contains no platform copies.")
-        else:
+            if plan.for_real_oficial_campaign:
+                campaign_compliant = False
+        elif not plan.for_real_oficial_campaign:
             for platform, copy in bundle.copies.items():
                 formatted = copy.formatted_text()
                 if not _CREDIT_TAG_RE.search(formatted):
@@ -372,43 +416,149 @@ class ComplianceFactAgent:
         if dedup_error:
             reasons.append(f"Rejected: {dedup_error}")
 
-        # 10. Real Oficial 'gta-vi-youtube' campaign validation
+        # 10. Official Real Oficial 'YouTube x GTA VI' (`KY4DWumZffg`) 13-Rule Campaign Validation
         if plan.for_real_oficial_campaign:
             rules = self._campaign_rules()
+            meta = plan.source.metadata or {}
+            src_url = (plan.source.url or "").strip()
+
+            # Rule: Authorized Live Source ONLY (`KY4DWumZffg`) — reject trailers & outside videos
+            if AUTHORIZED_LIVE_VIDEO_ID not in src_url or any(
+                tid in src_url for tid in FORBIDDEN_TRAILER_VIDEO_IDS
+            ):
+                campaign_compliant = False
+                reasons.append(
+                    f"Rejected: Real Oficial campaign allows ONLY authorized live source {AUTHORIZED_LIVE_VIDEO_ID} "
+                    "(trailers QdBZY2fkU-0/VQRLujxTm3c and outside videos are prohibited)."
+                )
+
+            # Rule: Valid Platforms ONLY (Instagram Reels and TikTok)
+            invalid_platforms = [
+                p.value for p in bundle.copies if p not in VALID_CAMPAIGN_PLATFORMS
+            ]
+            if invalid_platforms:
+                campaign_compliant = False
+                reasons.append(
+                    f"Rejected: Real Oficial campaign pays ONLY on instagram_reels and tiktok "
+                    f"(unsupported copy platforms: {', '.join(invalid_platforms)})."
+                )
+            if plan.target_platforms and not any(
+                p in VALID_CAMPAIGN_PLATFORMS for p in plan.target_platforms
+            ):
+                campaign_compliant = False
+                reasons.append(
+                    "Rejected: plan.target_platforms must target instagram_reels and/or tiktok for Real Oficial campaign."
+                )
+
+            # Rule: Clip duration window (10s - 58s)
             min_camp_dur = float(rules.get("min_duration_sec", 10.0))
             max_camp_dur = float(rules.get("max_duration_sec", 58.0))
-            required_tags: list[str] = list(
-                rules.get("required_hashtags", ["#GTA6", "#GTAVI", "#Shorts"])
-            )
-
             if duration < min_camp_dur or duration > max_camp_dur:
                 campaign_compliant = False
                 reasons.append(
                     f"Real Oficial campaign requires duration between {min_camp_dur:.0f}s and {max_camp_dur:.0f}s (got {duration:.1f}s)."
                 )
 
-            yt_copy = bundle.copies.get(Platform.YOUTUBE_SHORTS)
-            if yt_copy is None:
+            # Rule: Forbidden People (Samira Close & The Burnt Peanut)
+            meta_str_values = " ".join(str(v) for v in meta.values() if isinstance(v, str))
+            people_text = f"{corpus}\n{plan.source.creator_handle}\n{src_url}\n{meta_str_values}"
+            if (
+                bool(meta.get("samira_on_screen"))
+                or bool(meta.get("samira_close_on_screen"))
+                or bool(meta.get("burnt_peanut_on_screen"))
+                or _FORBIDDEN_CAMPAIGN_PEOPLE_RE.search(people_text)
+            ):
                 campaign_compliant = False
                 reasons.append(
-                    "Real Oficial campaign requires a YouTube Shorts copy in CaptionBundle."
+                    "Rejected: forbidden appearance/mention detected (Samira Close or The Burnt Peanut cannot appear in campaign clips)."
                 )
-            else:
-                yt_full_lower = yt_copy.formatted_text().lower()
-                yt_tags_lower = {
-                    (t if t.startswith("#") else f"#{t}").lower() for t in yt_copy.hashtags
-                }
-                missing_tags: list[str] = []
-                for req_tag in required_tags:
-                    normalized_req = (
-                        req_tag if req_tag.startswith("#") else f"#{req_tag}"
-                    ).lower()
-                    if normalized_req not in yt_full_lower and normalized_req not in yt_tags_lower:
-                        missing_tags.append(req_tag)
-                if missing_tags:
+
+            # Rule: No Old GTA / No 'Before GTA 6' Comparisons
+            if _OLD_GTA_COMPARISON_RE.search(corpus):
+                campaign_compliant = False
+                reasons.append(
+                    "Rejected: references previous GTA titles or 'antes do GTA 6' / 'before GTA 6' comparisons."
+                )
+
+            # Rule: Positive Hype Only (zero negative memes/mockery)
+            if _NEGATIVE_MOCKERY_RE.search(corpus):
+                campaign_compliant = False
+                reasons.append(
+                    "Rejected: negative mockery/criticism detected; Real Oficial campaign requires positive hype only."
+                )
+
+            # Rule: No AI Video & No Music Lyrics on Screen & No Logos/Watermarks
+            if bool(meta.get("is_ai_video")) or bool(meta.get("ai_generated")):
+                campaign_compliant = False
+                reasons.append(
+                    "Rejected: AI-generated video clips are strictly prohibited in Real Oficial campaign."
+                )
+
+            if bool(meta.get("has_music_lyrics_on_screen")):
+                campaign_compliant = False
+                reasons.append(
+                    "Rejected: song lyrics on screen are prohibited in Real Oficial campaign clips."
+                )
+
+            if (
+                bool(meta.get("has_logo_or_watermark"))
+                or bool(meta.get("has_channel_logo"))
+                or bool(meta.get("burn_credit_watermark"))
+            ):
+                campaign_compliant = False
+                reasons.append(
+                    "Rejected: channel logos and burned-in watermarks violate Rule #10 of the Real Oficial campaign."
+                )
+
+            # Rule #10: Exact phrase "Assista ao vivo em youtube.com/youtube" + ONLY hashtag #launchdayonYT
+            overlay_hashtags = _INLINE_HASHTAG_RE.findall(
+                f"{plan.hook_on_screen} {plan.commentary_overlay}"
+            )
+            bad_overlay_tags = [
+                t for t in overlay_hashtags if t.lower() != MANDATORY_ONLY_HASHTAG.lower()
+            ]
+            if bad_overlay_tags:
+                campaign_compliant = False
+                reasons.append(
+                    f"Rejected: unauthorized hashtag(s) {', '.join(bad_overlay_tags)} in overlay "
+                    f"(Rule #10 allows ONLY {MANDATORY_ONLY_HASHTAG})."
+                )
+
+            for platform, copy in bundle.copies.items():
+                if platform not in VALID_CAMPAIGN_PLATFORMS:
+                    continue
+                formatted = copy.formatted_text()
+
+                if not _MANDATORY_LIVE_PHRASE_RE.search(formatted):
                     campaign_compliant = False
                     reasons.append(
-                        f"Real Oficial campaign missing required YouTube Shorts hashtags: {', '.join(missing_tags)}."
+                        f"Rejected: {platform.value} copy missing mandatory phrase '{MANDATORY_CAPTION_PHRASE}'."
+                    )
+
+                inline_tags = _INLINE_HASHTAG_RE.findall(formatted)
+                explicit_tags = [
+                    t.strip() if str(t).strip().startswith("#") else f"#{str(t).strip()}"
+                    for t in copy.hashtags
+                    if str(t).strip()
+                ]
+                all_tags = inline_tags + explicit_tags
+
+                if not any(t.lower() == MANDATORY_ONLY_HASHTAG.lower() for t in all_tags):
+                    campaign_compliant = False
+                    reasons.append(
+                        f"Rejected: {platform.value} copy missing mandatory hashtag '{MANDATORY_ONLY_HASHTAG}'."
+                    )
+
+                extra_tags = list(
+                    dict.fromkeys(
+                        t for t in all_tags if t.lower() != MANDATORY_ONLY_HASHTAG.lower()
+                    )
+                )
+                if extra_tags:
+                    campaign_compliant = False
+                    reasons.append(
+                        f"Rejected: {platform.value} copy contains unauthorized hashtag(s) "
+                        f"{', '.join(extra_tags)} — Rule #10 allows ONLY '{MANDATORY_ONLY_HASHTAG}'."
                     )
 
         if reasons:

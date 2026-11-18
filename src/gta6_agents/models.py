@@ -159,9 +159,9 @@ class ChampionshipEntry(BaseModel):
     id: str = Field(default_factory=lambda: new_id("ro_entry"))
     campaign_slug: str = "gta-vi-youtube"
     publication_id: str
-    youtube_url: str
+    youtube_url: str  # Holds published post URL (TikTok / Instagram Reels / Shorts)
     status: str = "pending_submission"  # pending_submission | previewed | submitted | manual_action_needed
-    estimated_cpm_brl: float = 1.25
+    estimated_cpm_brl: float = 4.00
     validated_views: int = 0
     notes: str = ""
     created_at: datetime = Field(default_factory=utc_now)

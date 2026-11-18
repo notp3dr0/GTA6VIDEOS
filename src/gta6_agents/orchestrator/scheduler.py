@@ -77,6 +77,15 @@ class DailyScheduler:
         self._jobs_configured = False
 
     def _resolve_short_slots(self) -> list[str]:
+        if getattr(self.orchestrator, "multi_channel", None) is not None:
+            try:
+                sched = self.orchestrator.multi_channel.build_daily_60_schedule()
+                times = sorted({str(item["time_brt"]).strip() for item in sched if item.get("time_brt")})
+                if times:
+                    return times
+            except Exception as exc:
+                logger.warning("Fallback from multi_channel schedule in DailyScheduler: %s", exc)
+
         campaign_root = (
             self.config.campaign.get("campaign", {})
             if isinstance(self.config.campaign, dict)
@@ -95,6 +104,8 @@ class DailyScheduler:
     def _resolve_x_slots(self) -> list[tuple[str, ContentPillar]]:
         platforms_cfg = (self.config.settings or {}).get("platforms", {})
         x_cfg = platforms_cfg.get("x", {}) if isinstance(platforms_cfg, dict) else {}
+        if isinstance(x_cfg, dict) and x_cfg.get("enabled") is False:
+            return []
         raw_slots = x_cfg.get("slots") if isinstance(x_cfg, dict) else None
         source_list = raw_slots if isinstance(raw_slots, list) and raw_slots else DEFAULT_X_SLOTS
 
@@ -113,8 +124,13 @@ class DailyScheduler:
             parsed.append((time_str, pillar))
         return parsed
 
-    async def _run_short_slot(self, slot_time: str) -> None:
-        logger.info("Executing scheduled Real Oficial YouTube Short slot (%s %s)...", slot_time, self.config.timezone)
+    async def _run_short_slot(self, slot_time: str, channel_id: str = "") -> None:
+        label = f"{channel_id}@{slot_time}" if channel_id else slot_time
+        logger.info(
+            "Executing scheduled Live Cut slot (%s %s)...",
+            label,
+            self.config.timezone,
+        )
         try:
             await self.orchestrator.run_daily_cycle(
                 max_items=1,
@@ -122,8 +138,30 @@ class DailyScheduler:
                 demo_video_fallback=self.config.dry_run,
             )
         except Exception as exc:
-            logger.exception("Scheduled Short slot (%s) failed: %s", slot_time, exc)
-            await self.orchestrator.notifier.notify_error(f"Scheduled Short slot {slot_time}", exc)
+            logger.exception("Scheduled slot (%s) failed: %s", label, exc)
+            await self.orchestrator.notifier.notify_error(f"Scheduled slot {label}", exc)
+
+    async def _run_tri_engine_recovery(self) -> None:
+        """Every 15m, probe/clear expired 5h AI rate-limit cooldowns & log resumable checkpoints."""
+        pool = getattr(self.orchestrator, "tri_engine_pool", None)
+        if pool is None:
+            return
+        try:
+            await pool.probe_cooldown_engines()
+            status = pool.get_pool_status()
+            resumable = pool.load_incomplete_checkpoints()
+            if resumable:
+                logger.info(
+                    "TriEnginePool 5h check: %d interrupted checkpoint task(s) ready to resume (available engines=%s).",
+                    len(resumable),
+                    [
+                        k
+                        for k, v in status.get("engines", {}).items()
+                        if v.get("status") == "AVAILABLE"
+                    ],
+                )
+        except Exception as exc:
+            logger.debug("TriEnginePool recovery check note: %s", exc)
 
     async def _run_x_slot(self, pillar: ContentPillar) -> None:
         logger.info("Executing scheduled X slot (pillar=%s)...", pillar.value)
@@ -151,21 +189,54 @@ class DailyScheduler:
             await self.orchestrator.notifier.notify_error("Scheduled Analytics Learning Loop", exc)
 
     def configure_jobs(self) -> list[dict[str, Any]]:
-        """Register all daily CronTriggers and periodic IntervalTriggers on AsyncIOScheduler."""
-        # 1. Real Oficial 'gta-vi-youtube' Shorts slots (10:00, 14:00, 18:00, 21:30 BRT)
-        for slot_str in self._resolve_short_slots():
-            hour, minute = _parse_hhmm(slot_str)
-            job_id = f"real_oficial_short_{hour:02d}_{minute:02d}"
+        """Register all 60 daily 5-channel slots, Skorpion turbo burst, Telegram poll, and 5h AI recovery."""
+        mc = getattr(self.orchestrator, "multi_channel", None)
+        scheduled_60 = False
+        if mc is not None:
+            try:
+                daily_60 = mc.build_daily_60_schedule()
+                for item in daily_60:
+                    slot_str = str(item["time_brt"]).strip()
+                    ch_id = str(item["channel_id"]).strip()
+                    hour, minute = _parse_hhmm(slot_str)
+                    job_id = f"mc_{ch_id}_{hour:02d}_{minute:02d}"
+                    self.scheduler.add_job(
+                        self._run_short_slot,
+                        trigger=CronTrigger(hour=hour, minute=minute, timezone=self.tz),
+                        args=[slot_str, ch_id],
+                        id=job_id,
+                        name=f"[{ch_id}] Live Cut ({slot_str} {self.config.timezone})",
+                        replace_existing=True,
+                    )
+                scheduled_60 = bool(daily_60)
+            except Exception as exc:
+                logger.warning("Could not build 60-slot matrix jobs (%s); using fallback slots.", exc)
+
+        if not scheduled_60:
+            for slot_str in self._resolve_short_slots():
+                hour, minute = _parse_hhmm(slot_str)
+                job_id = f"real_oficial_short_{hour:02d}_{minute:02d}"
+                self.scheduler.add_job(
+                    self._run_short_slot,
+                    trigger=CronTrigger(hour=hour, minute=minute, timezone=self.tz),
+                    args=[slot_str, ""],
+                    id=job_id,
+                    name=f"Real Oficial Cut ({slot_str} {self.config.timezone})",
+                    replace_existing=True,
+                )
+
+        # 1b. Skorpion PT-BR Gameplay Turbo Burst (22:32, 22:42, 22:52 BRT)
+        for turbo_min in (32, 42, 52):
             self.scheduler.add_job(
                 self._run_short_slot,
-                trigger=CronTrigger(hour=hour, minute=minute, timezone=self.tz),
-                args=[slot_str],
-                id=job_id,
-                name=f"Real Oficial Short ({slot_str} {self.config.timezone})",
+                trigger=CronTrigger(hour=22, minute=turbo_min, timezone=self.tz),
+                args=[f"22:{turbo_min:02d}", "skorpion_turbo"],
+                id=f"skorpion_ptbr_turbo_22_{turbo_min:02d}",
+                name=f"Turbo Gameplay Skorpion PT-BR (22:{turbo_min:02d} BRT)",
                 replace_existing=True,
             )
 
-        # 2. 6 Daily X (Twitter) slots (08:30, 10:30, 13:00, 15:30, 18:30, 21:30 BRT)
+        # 2. Optional X (Twitter) slots (only when enabled in settings.yaml)
         for slot_str, pillar in self._resolve_x_slots():
             hour, minute = _parse_hhmm(slot_str)
             job_id = f"x_slot_{hour:02d}_{minute:02d}_{pillar.value}"
@@ -187,7 +258,16 @@ class DailyScheduler:
             replace_existing=True,
         )
 
-        # 4. Self-improving Analytics Learning Loop every 6 hours
+        # 4. Tri-Engine 5-Hour Limit Recovery & Checkpoint Resume every 15 minutes
+        self.scheduler.add_job(
+            self._run_tri_engine_recovery,
+            trigger=IntervalTrigger(minutes=15, timezone=self.tz),
+            id="tri_engine_resume_15m",
+            name="Tri-Engine 5h Limit Recovery & Checkpoint Resume (15m)",
+            replace_existing=True,
+        )
+
+        # 5. Self-improving Analytics Learning Loop every 6 hours
         self.scheduler.add_job(
             self._run_learning_loop,
             trigger=IntervalTrigger(hours=6, timezone=self.tz),

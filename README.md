@@ -1,255 +1,239 @@
-# 🌴 GTA 6 Fast Clips & Real Oficial (`gta-vi-youtube`) — Sistema Multi-Agente Autônomo 24/7
+# 🔥 GTA VI Live Clippers BR & Real Oficial (`gta-vi-youtube`) — Operação Autônoma 5 Canais × Pool Tri-IA (24/7)
 
-Sistema multi-agente em Python projetado para operar **100% no piloto automático em um 2º PC por 5 dias seguidos** (1 dia configurando/validando + 4 dias fora gerenciado pelo celular), unindo dois motores em um único pipeline:
-
-1. **Página Faceless Global/BR de GTA 6**: curadoria rápida de notícias oficiais da Rockstar Games, segredos dos trailers, dicas, nostalgia de GTA V e clipes transformados com valor agregado em **YouTube Shorts, Instagram Reels, TikTok e X (6 slots/dia)**.
-2. **Campeonato Real Oficial (`gta-vi-youtube`)**: produção, validação de regras, upload de Shorts `9:16` (`1080x1920`) sem marca d'água de terceiros e integração oficial via **Streamable HTTP MCP (`https://api.realoficial.com.br/mcp`)** para maximizar views validadas e ganhos por CPM.
+Sistema multi-agente em Python projetado para rodar **100% no piloto automático em um 2º PC durante 5 dias seguidos** (1 dia configurando/validando + 4 dias fora gerenciando tudo pelo celular via Telegram), construído sob medida para dominar o **Campeonato Real Oficial: Live YouTube × GTA VI** e escalar **5 páginas brasileiras de Cortes de Lives de Streamers**.
 
 ---
 
-## 🧠 Arquitetura Completa — Enxame de 8 Agentes + Real Oficial
+## 🎯 Resumo Executivo da Operação
+
+- **5 Contas PT-BR Dedicadas de Cortes de Lives**: `12 cortes/dia` por conta = **`60 cortes exclusivos/dia` por rede** -> publicando simultaneamente em **TikTok + Instagram Reels** = **até `120 publicações/dia`** na campanha!
+- **Fase 1 — Plano de Guerra da Live Oficial de 25h (`19/11 01h00 BRT` -> `20/11 02h00 BRT`)**:
+  - **Única fonte autorizada (100% exclusiva)**: `https://www.youtube.com/watch?v=KY4DWumZffg` (*Live Oficial YouTube × GTA VI*). Qualquer clipe externo é bloqueado automaticamente.
+  - **Plataformas válidas que pagam**: **TikTok** e **Instagram Reels** (**R$ 4,00 a cada 1.000 views** acima de **5.000 views/vídeo**, teto de **R$ 400,00/vídeo**, premiação total de **R$ 25.500,00** + **1 Key oficial de GTA VI** para cada integrante do **TOP 10**). *(YouTube Shorts, Kwai e X ficam desativados no modo campanha pois não pontuam).*
+  - **Zero Logos & Zero Marcas d'Água**: renderização limpa `1080x1920` (`9:16`) com `burn_credit_watermark: false` — sem logo de canal, sem marca de terceiros e sem letras de música na tela.
+  - **Copy & Comentário Obrigatórios no Checklist**:
+    - Legenda contém obrigatoriamente `"Assista ao vivo em youtube.com/youtube"` e **APENAS** a hashtag `#launchdayonYT` (**zero hashtags extras** — `#GTA6`, `#Shorts`, etc. são bloqueadas na campanha!).
+    - **1º Comentário Fixado Obrigatório**: `"Assista em https://www.youtube.com/watch?v=KY4DWumZffg"`.
+  - **Escudos Anti-Desclassificação Ativos**:
+    - 🚫 **Blackout Samira Close (`07h04–08h10 BRT`)**: janela do podcast *Passaporte pra Vice City* sob bloqueio/gate visual estrito (zero segundos de Samira Close em tela).
+    - 🚫 **Hard Blackout The Burnt Peanut (`20h03–20h30 BRT`)**: corte temporal e semântico absoluto (`20h00–20h34 BRT` com margem de segurança).
+    - 🚫 **Proibições Estritas**: zero GTA V / San Andreas / comparações (*"antes do GTA 6"*), zero críticas/memes negativos/bugs, zero vídeos gerados por IA.
+  - **Modo Turbo nos Picos PT-BR**:
+    - 🚀 **Gameplay do Skorpion em Português (`22h30–22h57 BRT`)**: multiplicador `3x` de captura e corte imediato!
+    - 🔥 **Horário Nobre (`19h00–00h00 BRT`)**: cadência máxima nas 5 contas (respeitando o blackout `20h03–20h30`).
+- **Fase 2 — Virada Automática Pós-Live (`20/11 02h00 BRT` -> Dias 3 a 5 Fora de Casa)**:
+  - **Hard Stop às `01h57 BRT` de `20/11`**: trava automática de segurança 3 minutos antes do fim da live para nenhum upload cair fora do ar, protegendo a janela de **+48h de contagem de views (até `22/11 02h00 BRT`)** sem deletar, arquivar ou privar nenhum post da campanha.
+  - **Pivot Automático para Streamers BR de GTA VI**: a partir de `20/11 02h00 BRT`, as 5 contas mudam sozinhas para **Cortes de Lives de Streamers PT-BR jogando GTA VI** (`@Skorpion`, `@GamerCosta`, `@alanzoka`, `@loud_coringa`, `@PaulinhooLoko`, `@FunkyBlackCat`, `@Gaules`), mantendo o crescimento orgânico 24/7 enquanto você está fora!
+- **Pool Tri-IA Resiliente (`Claude Pro` + `Codex Plus` + `Antigravity Ultra`)**:
+  - Divisão inteligente de esforço (`THINK_XHIGH` vs `EXECUTE_LOW`), detecção automática de limite de **5 horas**, failover instantâneo sem perder progresso via SQLite (`task_checkpoints`) e sondas de retomada a cada 15 minutos.
+
+---
+
+## 🗺️ Arquitetura Operacional — Guerra 25h (`KY4DWumZffg`) + Pós-Live + Pool Tri-IA
 
 ```mermaid
 flowchart TD
-    subgraph FONTES["🔎 Fontes Oficiais & Comunidade"]
-        RN["Rockstar Newswire & Canal Oficial"]
-        ROA["Acervo Elegível Real Oficial (gta-vi-youtube)"]
-        YT_RD["YouTube / Reddit / Comunidade GTA 6"]
+    subgraph FASE1["🔴 FASE 1: LIVE 25H YOUTUBE x GTA VI (19/11 01h00 -> 20/11 02h00 BRT)"]
+        KY4["Fonte Exclusiva Autorizada<br/>youtube.com/watch?v=KY4DWumZffg"]
+        SHIELD["LiveKY4CampaignEngine + ComplianceFactAgent<br/>🚫 Blackout Samira Close (07:04-08:10)<br/>🚫 Blackout The Burnt Peanut (20:03-20:30)<br/>🚀 Turbo 3x Skorpion PT-BR (22:30-22:57)"]
+        KY4 --> SHIELD
     end
 
-    RN --> A1
-    ROA --> A1
-    YT_RD --> A1
-
-    A1["01. ScoutAgent<br/>Descoberta, Virality Score & Deduplicação SQLite"]
-    A1 --> A2["02. ScriptCopyAgent<br/>Hook 0-2s, Roteiro PT-BR/EN & Copy Nativa por Rede"]
-    A2 --> A3["03. ComplianceFactAgent<br/>Anti-Leak/Datamine, Anti-Prompt Injection & Crédito 🎥 @creator"]
-
-    A3 -- "Reprovado (Leak/Rumor Falso)" --> REJ["🚫 Descartado + Log Auditável"]
-    A3 -- "Pendente Revisão (Semi-Auto)" --> APP["📱 Fila Humana<br/>Telegram (/approve) & Dashboard Web"]
-    APP -- "Aprovado" --> A4
-    A3 -- "Auto-Approved" --> A4
-
-    subgraph VIDEO["🎬 Pipeline de Transformação Audiovisual"]
-        A4["04. ClipperEditorAgent<br/>Corte 10-58s, Blur-Pad HUD 1080x1920, -14 LUFS"]
-        A5["05. Voiceover & Subtitles<br/>Narração Neural (edge-tts / ElevenLabs) + Legendas .ass Queimadas"]
-        A4 <--> A5
+    subgraph FASE2["🟢 FASE 2: PÓS-LIVE DIAS 3–5 (Após 20/11 02h00 BRT)"]
+        STOP["Hard Stop Submissões Campanha (01h57 BRT)<br/>🛡️ Protege +48h de Contagem até 22/11 02h00"]
+        BR["Cortes de Lives Streamers BR de GTA VI<br/>Skorpion • Gamer Costa • Alanzoka • Coringa • Gaules"]
+        STOP --> BR
     end
 
-    A4 --> A6["06. PublisherAgent<br/>Anti-Shadowban (150 min) • YouTube Shorts • Reels • TikTok • X"]
-    A6 --> A7["07. RealOficialAgent<br/>Validação #GTA6 #GTAVI #Shorts + MCP Oficial (gta-vi-youtube)"]
-    A7 --> A8["08. AnalyticsLearningAgent & MultiAgentOrchestrator<br/>Métricas CPM, Ledgers JSONL, SQLite & Watchdog 5 Dias"]
+    SHIELD --> POOL
+    BR --> POOL
 
-    A8 <--> DASH["🖥️ Leonida Mission Control<br/>FastAPI Vice City Neon (Porta 8080)"]
-    A8 <--> TG["📲 Controle Remoto Celular<br/>Telegram Bot + Discord Webhook"]
+    subgraph POOL["🧠 Pool Tri-Engine de IAs (Auto-Resume 5h + Checkpoints SQLite)"]
+        C1["Claude Pro CLI<br/>Opus (max/xhigh) -> Haiku (low)"]
+        C2["Codex Plus CLI<br/>Sol 6.2 (xhigh) -> Sol 6.2 (low)"]
+        C3["Antigravity / Gemini Ultra<br/>Carbon (2.5 Pro) -> Hydrogen (Flash-Lite)"]
+        C1 -. "Limite 5h -> Failover" .-> C2
+        C2 -. "Limite 5h -> Failover" .-> C3
+    end
+
+    POOL --> MATRIX["📺 Matriz 5 Contas PT-BR × 12 Cortes/Dia = 60 Cortes Exclusivos/Dia<br/>Micro-Trim (+0.4s * idx) + Trava SQLite channel_segment_locks + Zero Marca d'Água"]
+
+    MATRIX --> PUB["📲 Publicação Dupla (Até 120 Posts/Dia)<br/>TikTok + Instagram Reels<br/>Legenda: 'Assista ao vivo em youtube.com/youtube' + #launchdayonYT<br/>📌 Fixado: 'Assista em https://www.youtube.com/watch?v=KY4DWumZffg'"]
+    PUB --> RO["🏆 Registro Imediato Real Oficial MCP<br/>app.realoficial.com.br/c/gta-vi-youtube"]
+    RO --> TG["📱 Controle Remoto Telegram + Painel Web (Porta 8080)"]
 ```
-
-### Os 8 Agentes e Papéis no Fluxo Faceless GTA 6
-
-| # | Agente / Módulo | Responsabilidade Principal |
-|---|---|---|
-| **01** | `ScoutAgent` (`agents/scout.py`) | Monitora Rockstar Newswire, trailers oficiais, acervo da campanha Real Oficial e tendências da comunidade; filtra fontes já usadas em `seen_sources`. |
-| **02** | `ScriptCopyAgent` (`agents/copywriter.py`) | Cria o **Hook visual (0–2s)**, roteiro de voz conciso e legendas nativas: **zero hashtags no X** + `🎥 @creator`, **até 5 hashtags no Reels**, e `#GTA6 #GTAVI #Shorts` na campanha do YouTube. |
-| **03** | `ComplianceFactAgent` (`agents/compliance.py`) | Bloqueia **leaks, datamines, pirataria, exploits, marcas d'água de terceiros**, afirmações falsas (*"this confirms"* / *"isso confirma"*) sem fonte oficial e neutraliza **prompt injection** em transcrições/títulos externos. |
-| **04** | `ClipperEditorAgent` (`agents/clipper.py`) | Renderiza vídeos verticais `1080x1920` (`30fps`, `H.264 + AAC`) via FFmpeg no modo `blur_pad_hud` (preservando o HUD 16:9 com fundo desfocado neon), banner de hook e normalização `-14 LUFS`. |
-| **05** | `Voiceover & Subtitles` (`video/voiceover.py`, `video/subtitles.py`) | Gera narração neural PT-BR (`pt-BR-AntonioNeural` 100% gratuita via `edge-tts` ou ElevenLabs) e queima legendas dinâmicas `.ass` de alta retenção. |
-| **06** | `PublisherAgent` (`agents/publisher.py`) | Publica/agenda respeitando janela mínima anti-shadowban (`150 min` na mesma rede) via YouTube Data API v3, X API v2, Buffer/Webhook ou APIs diretas Meta/TikTok. |
-| **07** | `RealOficialAgent` (`agents/real_oficial.py`) | Sincroniza a campanha `gta-vi-youtube` via cliente oficial MCP (`integrations/real_oficial_client.py`), registra entradas `ChampionshipEntry` e blinda seus créditos diários. |
-| **08** | `AnalyticsLearningAgent` + `MultiAgentOrchestrator` | Calcula distribuição dos pilares editoriais, views validadas, estimativa de CPM em R$, envia resumos no Telegram/Discord e mantém o loop 24/7 vivo nos 5 dias. |
-
-### Workflow Faceless GTA 6 (Pilares & Cadência Diária)
-
-Configurado em `config/settings.yaml` (`America/Sao_Paulo`):
-- **YouTube Shorts (Campanha Real Oficial + Orgânico)**: 3 a 4 Shorts/dia (`10:00`, `14:00`, `18:00`, `21:30` BRT).
-- **X / Twitter (6 Slots Diários)**:
-  - `08:30` `official_news` • `10:30` `tips_tutorials` • `13:00` `gameplay_clips` • `15:30` `gta5_nostalgia` • `18:30` `spotlights` • `21:30` `countdown_recap`
-- **Instagram Reels & TikTok**: 2 a 3 cortes verticais transformados por dia sem marca d'água cruzada.
-- **Identidade Transparente**: Página de fãs independente (*"Fan page, not affiliated with Rockstar Games"*), com crédito explícito `🎥 @creator` em todo conteúdo comunitário.
 
 ---
 
-## ⚡ Quickstart — Deixando o 2º PC Rodando por 5 Dias!
+## 📺 Matriz das 5 Contas PT-BR de Cortes de Lives (`config/channels_matrix.yaml`)
 
-Ideal para montar tudo em **1 dia**, validar os primeiros cortes no modo seguro (`DRY_RUN=true`), virar a chave para `LIVE` e viajar/ficar **4 dias fora** acompanhando tudo pelo Telegram!
+Cada página opera com **12 horários escalonados em +15 min** (evitando colisão de upload e IP no 2º PC), **micro-trim determinístico (`+0.4s * channel_idx`)**, trava atômica no SQLite (`channel_segment_locks`) para **jamais repetir o mesmo trecho no mesmo dia**, layout 9:16 próprio, cor exclusiva de legenda `.ass` e voz neural PT-BR distinta para dublagens/narrações permitidas.
 
-### 1. Pré-requisitos no 2º PC
-- **Python 3.11+**
-- **[uv](https://docs.astral.sh/uv/)** (gerenciador ultrarrápido de pacotes Python)
-- **FFmpeg** instalado no PATH (`winget install Gyan.FFmpeg` no Windows ou `sudo apt install ffmpeg` no Linux)
+> **Importante**: O pilar de comparações/nostalgia com jogos antigos foi **100% removido** de todos os canais, garantindo conformidade total com a regra anti-GTA V da campanha.
 
-### 2. Instalação e Configuração Inicial
+| # | ID (`channel_id`) | Página PT-BR | Handle | Ângulo Editorial | Layout & Cor `.ass` | IA Preferencial (`THINK_XHIGH`) |
+|---|---|---|---|---|---|---|
+| **1** | `ch1_plantao_oficial` | **Cortes Live Leonida** | `@cortesliveleonida` | Melhores Reações Ao Vivo & Momentos Insanos da Live | `blur_pad_hud` • Ciano | `claude_pro` |
+| **2** | `ch2_leonida_segredos` | **Radar Streamers Vice** | `@radarstreamersvice` | Descobertas Ao Vivo, Mapa & Easter Eggs dos Streamers | `smart_crop` • Magenta | `codex_plus` |
+| **3** | `ch3_gta6_dicas_pro` | **Plays & Clutches GTA 6** | `@playsgta6live` | Jogadas de Alto Nível, Fugas & Gameplay do Skorpion/Streamers | `blur_pad_hud` • Amarelo | `antigravity_ultra` |
+| **4** | `ch4_vice_motores` | **Fugas & Motores Live** | `@fugasmotoreslive` | Perseguições Ao Vivo, Carros & Caos em Vice City | `smart_crop` • Laranja | `claude_pro` |
+| **5** | `ch5_vice_stories` | **Cortes Resenha Vice** | `@cortesresenhavice` | Momentos Engraçados Positivos, Hype & Dublagens PT-BR da Live Mundial | `blur_pad_hud` • Verde | `codex_plus` |
+
+---
+
+## 📋 Linha do Tempo & Checklist de Blindagem da Campanha (`KY4DWumZffg`)
+
+Configurado em [`config/campaign_realoficial.yaml`](config/campaign_realoficial.yaml) (Fuso `America/Sao_Paulo` — BRT):
+
+| Horário (BRT) | Evento / Janela | Ação Automática do Sistema |
+|---|---|---|
+| **Antes de `19/11 01h00`** | `PRE_LIVE` (Aquecimento) | Bloqueia envios prematuros na campanha; valida credenciais, FFmpeg e filas. |
+| **`19/11 01h00`** | **Início Oficial da Live (25h)** | Libera captura exclusiva de `https://www.youtube.com/watch?v=KY4DWumZffg` e envios em **TikTok + Instagram Reels**. |
+| **`19/11 07h04 – 08h10`** | ⚠️ Podcast *Passaporte pra Vice City* | **Escudo Samira Close ativo** (`07h02–08h12` com margem): exige gate visual estrito / bloqueio preventivo caso você esteja ausente (zero segundos da Samira Close em tela). |
+| **`19/11 19h00 – 00h00`** | 🔥 **Horário Nobre BR** | Prioridade máxima de publicação e distribuição nos 5 canais. |
+| **`19/11 20h03 – 20h30`** | 🚫 **The Burnt Peanut na Live** | **Hard Blackout absoluto (`20h00–20h34`)**: qualquer segmento ou menção é descartado na hora. |
+| **`19/11 22h30 – 22h57`** | 🚀 **Gameplay PT-BR do Skorpion** | **OURO PURO (`burst_multiplier: 3`)**: captura prioritária em rajada para abastecer os 5 canais com gameplay em português! |
+| **`20/11 01h57`** | 🛑 **Hard Stop de Uploads da Campanha** | Trava submissões 3 minutos antes das `02h00` para garantir que 100% dos links sejam publicados e registrados **enquanto a live está no ar**. |
+| **`20/11 02h00 -> 22/11 02h00`** | 💰 **Contagem +48h & Virada Streamers BR** | Nenhum vídeo da campanha é apagado/arquivado; os 5 canais viram automaticamente para **Cortes de Lives de Streamers BR de GTA VI** pelos dias restantes! |
+
+### As Regras de Ouro Verificadas Automaticamente Antes de Cada Upload
+1. **Fonte 100% Exclusiva**: na campanha (`for_real_oficial_campaign=True`), somente `KY4DWumZffg` passa no [`ComplianceFactAgent`](src/gta6_agents/agents/compliance.py).
+2. **Zero Marca d'Água / Zero Logo**: `burn_credit_watermark: false` — vídeo `1080x1920` limpo, prendendo nos **2 primeiros segundos** com legendas dinâmicas `.ass` das falas.
+3. **Texto Obrigatório na Legenda**: `"Assista ao vivo em youtube.com/youtube"` + **somente** `#launchdayonYT` (qualquer hashtag adicional como `#GTA6` reprova o corte no modo campanha).
+4. **1º Comentário Fixado**: `"Assista em https://www.youtube.com/watch?v=KY4DWumZffg"`.
+5. **Hype 100% Positivo & Sem Jogos Antigos**: bloqueia termos de comparação com *GTA V*, *San Andreas*, *"antes do GTA 6"*, bugs, críticas negativas, leaks ou IA falsa.
+6. **Fora da Campanha (`for_campaign=False` / Pós-Live)**: restaura automaticamente as regras orgânicas de cortes de streamers (crédito `🎥 @creator`, zero hashtags no X, tags nativas no Reels/TikTok).
+
+---
+
+## 🤖 Pool Tri-IA com Auto-Resume de 5 Horas (`tri_engine_pool.py`)
+
+Para sustentar **60 cortes/dia (até 120 posts/dia)** durante 5 dias sem travar quando o `Claude Pro` ou o `Codex Plus` atingirem o limite da janela móvel de 5 horas:
+
+1. **Separação `THINK_XHIGH` vs `EXECUTE_LOW` (faz a cota render até 4× mais)**:
+   - **`Claude Pro`**: usa `Opus` (`--effort max` / `xhigh`) apenas para estratégia viral, escolha de timestamps não-sobrepostos e auditoria de regras (`THINK_XHIGH`), e `Haiku` (`low`) para formatação mecânica de legendas `.ass` e JSON (`EXECUTE_LOW`).
+   - **`Codex Plus`**: usa `sol-6.2` com `model_reasoning_effort="xhigh"` para pensar e `model_reasoning_effort="low"` para executar.
+   - **`Antigravity / Gemini Ultra`**: usa o roteador em camadas **Carbon** (`gemini-2.5-pro`) para raciocínio pesado e **Hydrogen** (`gemini-2.5-flash-lite`) para execução rápida, além de fallback determinístico local (`TEMPLATE_FALLBACK`) caso todas as 3 IAs estejam simultaneamente em janela de espera.
+2. **Checkpoints Atômicos em SQLite (`task_checkpoints`)**:
+   - Se o `Claude Pro` concluir o `THINK_XHIGH` (estágio salvo como `READY_TO_EXECUTE`) e bater no limite de 5 horas no meio do `EXECUTE_LOW`, o `Codex Plus` (ou `Antigravity Ultra`) assume **exatamente de `READY_TO_EXECUTE`**, **sem gastar tokens refazendo o `THINK_XHIGH`**!
+3. **Detecção de 5h & Sonda Automática a cada 15 Minutos**:
+   - O `RateLimitDetector` lê mensagens como `"5-hour usage limit"` / `"Resets in 2h 30m"` / `HTTP 429`, registra `COOLDOWN_5H` na tabela `engine_cooldowns` e dispara sondas leves a cada `15 min` (`900s`) para reintegrar a IA ao pool no minuto exato em que a janela liberar.
+
+---
+
+## ⚡ Como Iniciar Tudo no 2º PC (1 Clique no Windows ou Linux)
+
+### 1. Pré-requisitos
+- **Python 3.11+**, **[uv](https://docs.astral.sh/uv/)** e **FFmpeg** no `PATH` (`winget install Gyan.FFmpeg` no Windows ou `sudo apt install ffmpeg` no Linux).
+- Se usar os workers CLI locais: `claude` (Claude Code autenticado na conta Pro) e `codex` (Codex CLI autenticado na conta Plus) disponíveis no terminal.
+
+### 2. Instalação Rápida
 
 ```bash
-# 1. Entre na pasta do projeto
 cd GTA6VIDEOS
-
-# 2. Copie o arquivo de variáveis de ambiente
 cp .env.example .env
-
-# 3. Sincronize dependências (incluindo suporte YouTube OAuth e testes)
 uv sync --all-extras
 ```
 
-### 3. Teste Imediato no Painel Web (Modo Seguro `DRY_RUN=true`)
+Edite o `.env` com suas chaves (`GEMINI_API_KEY`, `REAL_OFICIAL_MCP_TOKEN`, `INSTAGRAM_ACCESS_TOKEN` / `TIKTOK_ACCESS_TOKEN` ou `BUFFER_ACCESS_TOKEN`, `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`).
+Depois de testar um ciclo em modo seguro (`DRY_RUN=true`), mude para produção antes de sair:
 
-Antes de conectar qualquer conta real, suba o **Leonida Mission Control**:
-
-```bash
-uv run uvicorn gta6_agents.dashboard.server:app --host 0.0.0.0 --port 8080
+```env
+DRY_RUN=false
+AUTOPILOT_MODE=full_auto
+MULTI_CHANNEL_ENABLED=true
+REAL_OFICIAL_ENABLED=true
 ```
 
-Abra `http://localhost:8080` no navegador e clique em **"Rodar Ciclo Demo Agora"**:
-- O sistema vai descobrir um candidato elegível, escrever roteiro + copy, validar no Compliance, renderizar um `.mp4` vertical `1080x1920` com legenda `.ass` em `output/`, simular o envio para `gta-vi-youtube` e atualizar os cards em tempo real!
+### 3. Partida em 1 Clique no Windows (`INICIAR_3_IAS_5_CANAIS.bat`)
 
-### 4. Iniciar Operação Contínua 24/7 no 2º PC (5 Dias Autônomos)
+Dê dois cliques em **`INICIAR_3_IAS_5_CANAIS.bat`** (na raiz do projeto) ou rode no Prompt/PowerShell:
 
-#### 🪟 No Windows (PowerShell)
-1. Em **Configurações -> Sistema -> Energia e Suspensão**, defina *"Suspender atividade do computador"* para **Nunca** (mantenha na tomada e cabo de rede se possível).
-2. Execute o script com auto-restart (watchdog), prevenção de sleep e painel simultâneo:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\start_2pc_windows.ps1
+```bat
+.\INICIAR_3_IAS_5_CANAIS.bat
 ```
 
-#### 🐧 No Linux / Ubuntu / Mini-PC
-Execute o launcher resiliente que mantém o orquestrador 24/7 + dashboard ativos em background com reconexão automática:
+Esse atalho sobe simultaneamente **3 janelas com watchdog infinito e bloqueio anti-suspensão do Windows** (`SetThreadExecutionState` + `powercfg`):
+1. **Maestro 5 Canais & Painel Web (`scripts\start_2pc_windows.ps1`)** — Orquestrador 24/7 + Antigravity/Gemini + Dashboard *Leonida Mission Control* na porta `8080`.
+2. **Worker Claude Pro 5h Loop (`scripts\worker_claude_5h.ps1`)** — Ciclo contínuo `Opus (max)` + `Haiku (low)` com sonda de auto-resume de 15 min.
+3. **Worker Codex Plus 5h Loop (`scripts\worker_codex_5h.ps1`)** — Ciclo contínuo `sol-6.2 (xhigh)` + `sol-6.2 (low)` com sonda de auto-resume de 15 min.
+
+### 4. Partida no Linux / Mini-PC / WSL2
 
 ```bash
 chmod +x ./scripts/start_2pc_linux.sh
 ./scripts/start_2pc_linux.sh
 ```
 
-> **Dica de Ouro para os 4 Dias Fora**: Quando já tiver testado 1 ciclo real com sucesso, configure no `.env`:
-> ```env
-> DRY_RUN=false
-> AUTOPILOT_MODE=semi_auto   # ou full_auto para postar 100% sem intervenção nos pilares aprovados
-> ```
-
 ---
 
-## 🔌 Passo a Passo das Integrações Oficiais
+## 🔌 Configuração de Publicação & Controle pelo Celular
 
-### 1. Conectar Real Oficial (`gta-vi-youtube`)
-
-1. Acesse a página oficial da campanha pelo seu navegador e aceite os termos humanos da campanha:
-   - 🔗 **[Campanha GTA VI YouTube no Real Oficial](https://app.realoficial.com.br/c/gta-vi-youtube?ro_vid=a56ec50b-725e-4c73-a353-4e3b2e80678b)**
-2. No painel da sua conta Real Oficial, copie seu token de API / MCP e preencha no `.env`:
+### 1. Campanha Real Oficial (`gta-vi-youtube`)
+1. Aceite os termos da campanha uma vez pelo navegador:
+   - 🔗 `https://app.realoficial.com.br/c/gta-vi-youtube?ro_vid=a56ec50b-725e-4c73-a353-4e3b2e80678b`
+2. Preencha no `.env`:
    ```env
    REAL_OFICIAL_ENABLED=true
    REAL_OFICIAL_MCP_TOKEN=seu_token_mcp_aqui
-   REAL_OFICIAL_API_KEY=sua_api_key_opcional
    REAL_OFICIAL_CAMPAIGN_SLUG=gta-vi-youtube
-   REAL_OFICIAL_DAILY_CREDIT_LIMIT=150
    REAL_OFICIAL_ALLOW_SPEND_CREDITS=false
    ```
-3. **Garantias de Segurança Financeira & Anti-Ban**:
-   - O cliente (`RealOficialClient`) comunica-se **exclusivamente** com a API/MCP oficial (`https://api.realoficial.com.br/mcp` via JSON-RPC 2.0) — **jamais** faz scraping HTML ou burla proteções anti-bot.
-   - A tool `ro_start_purchase` (compra via PIX/dinheiro) é **bloqueada em código (`FORBIDDEN_MCP_TOOLS`)**.
-   - Com `REAL_OFICIAL_ALLOW_SPEND_CREDITS=false` (padrão), todo o corte `9:16` e legendagem é feito **localmente de graça via FFmpeg no seu 2º PC**, gastando **0 créditos** da plataforma!
-   - Revise `config/campaign_realoficial.yaml` para manter as hashtags obrigatórias (`#GTA6`, `#GTAVI`, `#Shorts`) e URLs do acervo oficial sincronizadas com o regulamento vigente.
+   - Com `REAL_OFICIAL_ALLOW_SPEND_CREDITS=false`, todos os cortes `1080x1920` são renderizados localmente via FFmpeg no 2º PC (**custo zero de créditos**), e a compra automática via PIX (`ro_start_purchase`) é bloqueada por segurança em código.
+
+### 2. TikTok + Instagram Reels (As 2 Redes que Pagam na Campanha!)
+Configure no `.env` via APIs diretas ou Buffer/Webhook para publicar nas 5 contas e fixar o comentário da live:
+```env
+INSTAGRAM_ACCESS_TOKEN=seu_token_graph_api
+INSTAGRAM_IG_USER_ID=seu_ig_user_id
+TIKTOK_ACCESS_TOKEN=seu_token_tiktok_posting_api
+
+# Ou via Buffer / Make / n8n:
+BUFFER_ENABLED=true
+BUFFER_ACCESS_TOKEN=seu_token_buffer
+BUFFER_PROFILE_IDS=id_tiktok_1,id_reels_1,...
+WEBHOOK_PUBLISHER_URL=https://hook.us1.make.com/seu_webhook_opcional
+```
+
+### 3. Controle Remoto no Celular via Telegram (Para os 4 Dias Fora!)
+Crie seu bot no `@BotFather`, pegue seu `CHAT_ID` no `@userinfobot` e preencha `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` no `.env`. Comandos em tempo real pelo celular:
+- `/status` — Fase atual (`PRE_LIVE`, `LIVE_CAMPAIGN` ou `POST_LIVE_STREAMERS`), saúde das 3 IAs, cortes postados por canal, entradas registradas e estimativa de ganhos (R$ 4,00 / 1k views).
+- `/pause` / `/resume` — Pausa ou retoma instantaneamente as postagens no 2º PC.
+- `/approve <plan_id>` / `/reject <plan_id>` — Aprova ou descarta cortes retidos para inspeção visual (ex.: janela das `07h04–08h10`).
 
 ---
 
-### 2. Conectar YouTube Data API v3 (Upload Automático de Shorts)
-
-Obrigatório para publicar os Shorts públicos que pontuam na campanha `gta-vi-youtube`:
-
-1. Acesse o [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e ative a **YouTube Data API v3** em *APIs e Serviços -> Biblioteca*.
-2. Em *Tela de Permissão OAuth*, adicione o e-mail do seu canal YouTube como usuário de teste (ou publique o app).
-3. Em *Credenciais -> Criar Credenciais -> ID do cliente OAuth*, escolha **App para computador (Desktop App)**.
-4. Coloque `YOUTUBE_CLIENT_ID` e `YOUTUBE_CLIENT_SECRET` no `.env` e rode o gerador de 1 comando (em um PC com navegador):
-   ```bash
-   uv run --extra youtube python scripts/generate_youtube_token.py
-   ```
-5. Autorize o canal na janela do Google e cole o `YOUTUBE_REFRESH_TOKEN` gerado no seu `.env`:
-   ```env
-   YOUTUBE_ENABLED=true
-   YOUTUBE_CLIENT_ID=seu_client_id
-   YOUTUBE_CLIENT_SECRET=seu_client_secret
-   YOUTUBE_REFRESH_TOKEN=1//04xxxxxxxxxxxx
-   YOUTUBE_CHANNEL_HANDLE=@SeuCanalGTA6
-   ```
-
----
-
-### 3. Conectar Bot de Controle Remoto no Telegram (Gerencie pelo Celular!)
-
-Enquanto o 2º PC trabalha sozinho nos 4 dias em que você estiver fora, o bot envia alertas a cada Short postado, avisa sobre erros e aceita comandos instantâneos:
-
-1. No Telegram, chame o **[@BotFather](https://t.me/BotFather)**, envie `/newbot` e copie o token gerado.
-2. Envie uma mensagem para o seu novo bot e descubra seu ID numérico falando com o **[@userinfobot](https://t.me/userinfobot)**.
-3. Preencha no `.env`:
-   ```env
-   TELEGRAM_BOT_TOKEN=123456789:AAHxxxxxxxxxxxxxxxxxxx
-   TELEGRAM_CHAT_ID=987654321
-   DISCORD_WEBHOOK_URL=   # Opcional: webhook de um canal privado no Discord
-   ```
-4. **Comandos disponíveis direto do seu celular**:
-   - `/status` — Resumo completo (estado ativo/pausado, Shorts enviados na `gta-vi-youtube`, views validadas, ganho estimado R$ e créditos do dia).
-   - `/pause` — Pausa imediatamente novas postagens no 2º PC.
-   - `/resume` — Retoma o agendamento 24/7.
-   - `/approve <plan_id>` — Aprova um corte retido na fila de revisão humana.
-   - `/reject <plan_id>` — Descarta um corte retido.
-
----
-
-### 4. Conectar X (Twitter) API v2 & Buffer / Webhook (Reels & TikTok)
-
-- **Para os 6 posts diários no X**:
-  1. No [X Developer Portal](https://developer.x.com/), crie um App com permissão **Read and Write** e gere as 4 chaves OAuth 1.0a + Bearer Token.
-  2. Configure no `.env`:
-     ```env
-     X_ENABLED=true
-     X_API_KEY=...
-     X_API_SECRET=...
-     X_ACCESS_TOKEN=...
-     X_ACCESS_TOKEN_SECRET=...
-     X_BEARER_TOKEN=...
-     ```
-- **Para Instagram Reels, TikTok e Threads (via Buffer ou Webhook Make/n8n)**:
-  ```env
-  BUFFER_ENABLED=true
-  BUFFER_ACCESS_TOKEN=seu_token_buffer
-  BUFFER_PROFILE_IDS=id_perfil_reels,id_perfil_tiktok
-  WEBHOOK_PUBLISHER_URL=https://hook.us1.make.com/seu_webhook_opcional
-  ```
-  *(Alternativamente, preencha `INSTAGRAM_ACCESS_TOKEN` + `INSTAGRAM_IG_USER_ID` e `TIKTOK_ACCESS_TOKEN` no `.env` para publicação direta via Graph API / TikTok Content Posting API).*
-
----
-
-## 🗂️ Estrutura de Diretórios & Ledgers Auditáveis
+## 🗂️ Estrutura Principal do Projeto
 
 ```text
 GTA6VIDEOS/
+├── INICIAR_3_IAS_5_CANAIS.bat          # Launcher 1-clique Windows (Maestro + Claude 5h + Codex 5h)
 ├── config/
-│   ├── settings.yaml               # Horários BRT, limites por rede, FFmpeg 9:16 e regras de aprovação
-│   └── campaign_realoficial.yaml   # Regras da campanha gta-vi-youtube, hashtags e acervo elegível
-├── data/
-│   └── state.db                    # SQLite (deduplicação, fila humana, publicações, créditos e flags)
-├── memory/
-│   ├── source_ledger.jsonl         # Histórico auditável de fontes descobertas
-│   ├── asset_ledger.jsonl          # Registro de vídeos renderizados + base de permissão/crédito
-│   └── posted_history.jsonl        # Ledger imutável de todos os posts publicados/simulados
-├── output/                         # Vídeos finais .mp4 (1080x1920) + legendas .ass prontos
+│   ├── campaign_realoficial.yaml       # Regulamento exato KY4DWumZffg, blackouts, #launchdayonYT e pós-live BR
+│   ├── channels_matrix.yaml            # Matriz das 5 contas PT-BR de Cortes de Lives (12 slots/dia cada)
+│   └── settings.yaml                   # Pipeline FFmpeg 1080x1920 sem marca d'água, Reels + TikTok ativos
+├── routines/
+│   ├── CLAUDE_PRO_5H_ROUTINE.md        # Diretriz operacional Opus xhigh / Haiku low + checkpoints
+│   └── CODEX_PLUS_5H_ROUTINE.md        # Diretriz operacional Sol 6.2 xhigh / low + checkpoints
 ├── scripts/
-│   ├── generate_youtube_token.py   # Gerador OAuth 2.0 do YOUTUBE_REFRESH_TOKEN
-│   ├── start_2pc_windows.ps1       # Watchdog 5 dias para Windows PowerShell
-│   └── start_2pc_linux.sh          # Watchdog 5 dias para Linux
+│   ├── start_2pc_windows.ps1           # Watchdog 5 dias + anti-sleep Windows + Dashboard porta 8080
+│   ├── start_2pc_linux.sh              # Watchdog 5 dias Linux / WSL2
+│   ├── worker_claude_5h.ps1            # Loop contínuo Claude Pro com sonda de 15 min
+│   └── worker_codex_5h.ps1             # Loop contínuo Codex Plus com sonda de 15 min
 ├── src/gta6_agents/
-│   ├── agents/                     # Os agentes especializados (Scout, Copy, Compliance, Clipper, etc.)
-│   ├── integrations/               # Clientes oficiais Real Oficial MCP, YouTube v3, X, Meta/TikTok, Buffer
-│   ├── video/                      # Downloader yt-dlp, FFmpeg Blur-Pad 9:16, Edge-TTS e legendas .ass
-│   ├── orchestrator/               # Pipeline diário 24/7 + Bot Remoto Telegram/Discord
-│   └── dashboard/server.py         # Painel Web FastAPI "Leonida Mission Control"
-└── tests/                          # Suíte Pytest automatizada (Compliance, Copy, FFmpeg e Pipeline E2E)
+│   ├── agents/                         # LiveKY4CampaignEngine, Compliance, Copywriter, Clipper, Publisher, RealOficial
+│   ├── orchestrator/                   # MultiChannelCoordinator (60/dia), TriEnginePool (3 IAs), Pipeline & Bot Telegram
+│   ├── integrations/                   # Clientes oficiais Real Oficial MCP, Meta/TikTok, Buffer, YouTube, X
+│   ├── video/                          # yt-dlp, FFmpeg 9:16, Edge-TTS PT-BR e legendas .ass
+│   └── dashboard/server.py             # Painel Web FastAPI "Leonida Mission Control"
+└── tests/                              # Suíte automatizada Pytest (Campanha KY4, Compliance, Matriz 5 Canais, Tri-IA e FFmpeg)
 ```
 
 ---
 
-## 🧪 Rodando a Suíte de Testes
+## 🧪 Validação e Testes Automatizados
 
-Para validar o bloqueio anti-leak/anti-injection, templates de copy, renderização real FFmpeg `1080x1920` com `.ass` e o ciclo ponta a ponta:
+Para testar toda a blindagem da campanha `KY4DWumZffg` (blackout Samira Close e The Burnt Peanut, trava `#launchdayonYT`, bloqueio de GTA V, matriz de 60 slots/dia, failover de 5h do Pool Tri-IA e renderização FFmpeg `1080x1920`):
 
 ```bash
 uv run pytest -v

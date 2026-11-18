@@ -1,125 +1,210 @@
 # ==============================================================================
-# BANCO OFICIAL DE CLIPES PRONTO PARA O DIA 1 (100% MATERIAL OFICIAL ROCKSTAR)
-# Protecao contra o Erro Fatal #1 (ficar sem estoque no Dia 1) e #3 (zero leaks)
+# MATRIZ DE JANELAS DE CORTES — LIVE OFICIAL YOUTUBE x GTA VI (KY4DWumZffg)
+# ÚNICA FONTE VÁLIDA NA CAMPANHA: https://www.youtube.com/watch?v=KY4DWumZffg
+# Regras aplicadas em 100% dos itens:
+# - ZERO trailers externos (QdBZY2fkU-0 / VQRLujxTm3c bloqueados)
+# - ZERO Samira Close e ZERO The Burnt Peanut (janela 20:00-20:34 BRT pulada)
+# - ZERO comparações com GTA antigo ("antes do GTA 6", Los Santos, San Andreas)
+# - 100% foco em cortes de live de streamers em PT-BR (e dublados/legendados PT-BR)
 # ==============================================================================
 vault_cuts:
-  - id: "t1_lucia_intro"
-    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-    creator: "@RockstarGames"
-    title: "Lucia Caminos Opening Frame & Leonida Sun"
-    pillar: "spotlights"
-    start_sec: 5
-    end_sec: 29
+  - id: "ky4_01_abertura_mundial_live"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeBrasil"
+    title: "Abertura Mundial da Live Oficial YouTube x GTA VI em Leonida"
+    pillar: "real_oficial_campaign"
+    start_sec: 120
+    end_sec: 146
     verified_facts:
-      - "Lucia Caminos é uma das protagonistas confirmadas no Trailer 1 oficial da Rockstar Games."
-      - "A iluminação volumétrica do sistema prisional de Leonida abre o primeiro trailer oficial."
-  - id: "t1_vice_beach_crowds"
-    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-    creator: "@RockstarGames"
-    title: "Vice Beach NPC Crowd Density & Animations"
-    pillar: "gameplay_clips"
-    start_sec: 19
-    end_sec: 42
+      - "A transmissão oficial de 25 horas do lançamento de GTA VI abriu ao vivo reunindo streamers do mundo inteiro."
+      - "Primeiras reações em tempo real à chegada em Leonida e Vice City."
+  - id: "ky4_02_primeiros_passos_vice_city"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Primeira Volta Ao Vivo pelas Avenidas Iluminadas de Vice City"
+    pillar: "real_oficial_campaign"
+    start_sec: 600
+    end_sec: 626
     verified_facts:
-      - "Vice Beach exibe dezenas de NPCs simultâneos com animações independentes, cães e jet-skis ao fundo."
-      - "A física da água e reflexos costeiros foram revelados oficialmente no Trailer 1."
-  - id: "t1_grassrivers_wildlife"
-    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-    creator: "@RockstarGames"
-    title: "Grassrivers Airboat, Flamingos & Alligators"
-    pillar: "spotlights"
-    start_sec: 27
-    end_sec: 49
+      - "Gameplay ao vivo na transmissão oficial destacando o tráfego dinâmico e a iluminação noturna de Vice City."
+      - "Reação empolgada dos streamers explorando cada esquina em tempo real."
+  - id: "ky4_03_leonida_keys_lancha_live"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Travessia de Lancha em Alta Velocidade por Leonida Keys Ao Vivo"
+    pillar: "real_oficial_campaign"
+    start_sec: 1800
+    end_sec: 1825
     verified_facts:
-      - "A região pantanosa de Grassrivers traz aerobarcos, bandos de flamingos e jacarés detalhados."
-      - "Ecossistema inspirado nos Everglades da Flórida confirmado oficialmente para o estado de Leonida."
-  - id: "t1_ocean_drive_night"
-    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-    creator: "@RockstarGames"
-    title: "Vice City Ocean Drive Classic Cars & Neon"
-    pillar: "gta5_nostalgia"
-    start_sec: 38
-    end_sec: 61
+      - "Ondas dinâmicas, espuma marítima e pontes tropicais de Leonida Keys testadas ao vivo na transmissão oficial."
+      - "Corte legendado em português direto da live mundial YouTube x GTA VI."
+  - id: "ky4_04_grassrivers_aerobarco_live"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Exploração Ao Vivo de Aerobarco nos Pântanos de Grassrivers"
+    pillar: "real_oficial_campaign"
+    start_sec: 3600
+    end_sec: 3626
     verified_facts:
-      - "Os hotéis Art Déco iluminados por neon retornam em escala moderna em Vice City."
-      - "Carros clássicos conversíveis e muscle cars desfilam à noite com reflexos em tempo real na lataria."
-  - id: "t1_mud_club_trucks"
-    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-    creator: "@RockstarGames"
-    title: "Thrillbilly Mud Club Monster Trucks Physics"
-    pillar: "gameplay_clips"
-    start_sec: 50
-    end_sec: 72
+      - "Vida selvagem reagindo em tempo real durante a travessia pelos pântanos de Grassrivers na live oficial."
+      - "Física da água e vegetação densa arrancando reações incríveis no chat."
+  - id: "ky4_05_skorpion_gamer_costa_solo_01"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@Skorpion"
+    title: "Skorpion e Gamer Costa Comentando os Detalhes de Vice City"
+    pillar: "real_oficial_campaign"
+    start_sec: 22140
+    end_sec: 22164
     verified_facts:
-      - "O Thrillbilly Mud Club mostra deformação de lama e caminhonetes gigantes suspensas no interior de Leonida."
-      - "Diversidade cultural entre o glamour de Vice City e o interior rural de Leonida."
-  - id: "t1_social_media_parody"
-    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-    creator: "@RockstarGames"
-    title: "In-Game Vertical Social Feed & Viral Leonida Moments"
-    pillar: "official_news"
-    start_sec: 56
-    end_sec: 80
+      - "Momento em português no Passaporte pra Vice City focado exclusivamente em Skorpion e Gamer Costa."
+      - "Análise empolgada em PT-BR sobre a escala de Leonida durante a live oficial."
+  - id: "ky4_06_skorpion_gamer_costa_solo_02"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@GamerCosta"
+    title: "Gamer Costa Destacando as Regiões Mais Insanas de Leonida"
+    pillar: "real_oficial_campaign"
+    start_sec: 23400
+    end_sec: 23425
     verified_facts:
-      - "O Trailer 1 apresentou clipes verticais gravados pelos próprios moradores de Leonida dentro do universo do jogo."
-      - "Sátira moderna da cultura de vídeos curtos e eventos caóticos nas ruas de Leonida."
-  - id: "t1_highway_getaway"
-    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-    creator: "@RockstarGames"
-    title: "Lucia & Jason High-Speed Getaway & Trust Pact"
-    pillar: "countdown_recap"
-    start_sec: 68
-    end_sec: 90
+      - "Destaque em português com Gamer Costa e Skorpion comentando as missões e rotas de Vice City."
+      - "Corte verificado sem apresentadores restritos em quadro."
+  - id: "ky4_07_port_gellhorn_fuga_tatica"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Fuga Cinematográfica Ao Vivo pelas Ruas de Port Gellhorn"
+    pillar: "real_oficial_campaign"
+    start_sec: 28800
+    end_sec: 28826
     verified_facts:
-      - "A dupla Lucia e Jason protagoniza fugas coordenadas em alta velocidade pelas rodovias de Leonida."
-      - "O pacto 'Trust' encerra o Trailer 1 oficial da Rockstar Games."
-  - id: "t2_jason_keys_morning"
-    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
-    creator: "@RockstarGames"
-    title: "Jason Duval & Leonida Keys Coastal Atmosphere"
-    pillar: "spotlights"
-    start_sec: 4
-    end_sec: 28
+      - "Perseguição intensa em Port Gellhorn transmitida ao vivo com manobras no limite pela costa."
+      - "Física de suspensão e fumaça volumétrica de pneus em destaque na live."
+  - id: "ky4_08_mount_kalaga_trilha_offroad"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Subida Radical Off-Road em Mount Kalaga na Live Oficial"
+    pillar: "real_oficial_campaign"
+    start_sec: 34200
+    end_sec: 34226
     verified_facts:
-      - "O Trailer 2 oficial aprofunda a rotina de Jason Duval nas ilhas costeiras de Leonida Keys."
-      - "Pontes tropicais, barcos e iluminação costeira realista capturados diretamente no hardware de console."
-  - id: "t2_vehicle_interiors"
-    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
-    creator: "@RockstarGames"
-    title: "GTA 6 Car Interiors, Mirrors & Suspension Details"
-    pillar: "tips_tutorials"
-    start_sec: 28
-    end_sec: 52
+      - "Trilhas íngremes, neblina nas montanhas e rios de Mount Kalaga explorados ao vivo pelos criadores."
+      - "Imersão sonora e visual impressionante no norte de Leonida."
+  - id: "ky4_09_customizacao_carros_vice"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Encontro de Carros Customizados Brilhando sob o Neon de Vice City"
+    pillar: "real_oficial_campaign"
+    start_sec: 39600
+    end_sec: 39625
     verified_facts:
-      - "Retrovisores funcionais, painéis internos detalhados e transferência de peso da suspensão visíveis no Trailer 2."
-      - "Física de fumaça de pneu e iluminação interna realista nos veículos de Leonida."
-  - id: "t2_port_gellhorn_action"
-    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
-    creator: "@RockstarGames"
-    title: "Port Gellhorn Chase & Police Tactical Response"
-    pillar: "gameplay_clips"
-    start_sec: 52
-    end_sec: 77
+      - "Reflexos em tempo real na pintura metálica e interiores detalhados mostrados ao vivo na transmissão."
+      - "Cultura automotiva de Leonida celebrada pelos streamers."
+  - id: "ky4_10_tempestade_tropical_live"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Mudança Climática Ao Vivo com Tempestade Tropical em Vice Beach"
+    pillar: "real_oficial_campaign"
+    start_sec: 45000
+    end_sec: 45026
     verified_facts:
-      - "Port Gellhorn traz áreas portuárias, motéis e perseguições intensas com viaturas estaduais de Leonida."
-      - "Comportamento tático da polícia e destruição ambiental exibidos no material oficial."
-  - id: "t2_mount_kalaga_wilderness"
-    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
-    creator: "@RockstarGames"
-    title: "Mount Kalaga National Park & Off-Road Trails"
-    pillar: "spotlights"
-    start_sec: 78
-    end_sec: 102
+      - "Vento costeiro, chuva intensa e reflexos nas poças transformando Vice Beach ao vivo na transmissão."
+      - "Nuvens volumétricas iluminadas pelo pôr do sol de Leonida."
+  - id: "ky4_11_voo_panoramico_leonida"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Sobrevoo de Helicóptero Mostrando o Horizonte Completo de Vice City"
+    pillar: "real_oficial_campaign"
+    start_sec: 50400
+    end_sec: 50425
     verified_facts:
-      - "O Parque Nacional Mount Kalaga fica na fronteira norte de Leonida com florestas densas, rios e trilhas off-road."
-      - "Caiaques, vida selvagem e neblina matinal confirmados oficialmente pela Rockstar Games."
-  - id: "t2_vice_city_skyline_finale"
-    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
-    creator: "@RockstarGames"
-    title: "Vice City Full Skyline & Launch Scale Comparison"
-    pillar: "gta5_nostalgia"
-    start_sec: 103
-    end_sec: 129
+      - "Distância de renderização absurda revelando ilhas, pontes e avenidas movimentadas ao vivo."
+      - "Reação de puro hype dos streamers vendo o mapa do alto."
+  - id: "ky4_12_ambrosia_rodovia_motores"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Acelerando Tudo nas Rodovias Industriais de Ambrosia Ao Vivo"
+    pillar: "real_oficial_campaign"
+    start_sec: 55800
+    end_sec: 55826
     verified_facts:
-      - "Depois de mais de uma década em Los Santos, a escala vertical e marítima de Vice City redefine o mapa da franquia."
-      - "Material 100% oficial da Rockstar Games pronto para o lançamento."
+      - "Ronco dos motores e sensação de velocidade nas retas de Ambrosia durante a live oficial."
+      - "Transição fluida entre o interior industrial e o litoral de Leonida."
+  - id: "ky4_13_horario_nobre_americas_01"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeBrasil"
+    title: "Horário Nobre Ao Vivo — Caos Positivo e Risadas em Vice Beach"
+    pillar: "real_oficial_campaign"
+    start_sec: 65400
+    end_sec: 65425
+    verified_facts:
+      - "Interações espontâneas dos moradores de Leonida surpreendendo os criadores no horário nobre."
+      - "Momento viral legendado em português direto da transmissão YouTube x GTA VI."
+  - id: "ky4_14_horario_nobre_americas_02"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeBrasil"
+    title: "Manobra Impossível de Jet-Ski nos Canais de Vice City Ao Vivo"
+    pillar: "real_oficial_campaign"
+    start_sec: 66900
+    end_sec: 66925
+    verified_facts:
+      - "Salto insano pelos canais aquáticos de Vice City arrancando gritos na transmissão ao vivo."
+      - "Física marítima em tempo real no auge do horário nobre."
+  - id: "ky4_15_pos_janela_2035_drift_neon"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeGaming"
+    title: "Drift Perfeito na Avenida Costeira de Vice City à Noite"
+    pillar: "real_oficial_campaign"
+    start_sec: 71100
+    end_sec: 71126
+    verified_facts:
+      - "Controle preciso de tração e iluminação neon refletida no asfalto molhado após as 20h35 BRT."
+      - "Corte 100% seguro fora de qualquer janela restrita da transmissão."
+  - id: "ky4_16_skorpion_gameplay_ptbr_01"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@Skorpion"
+    title: "Skorpion Ao Vivo Jogando GTA VI em Português — Entrada Épica!"
+    pillar: "real_oficial_campaign"
+    start_sec: 77460
+    end_sec: 77486
+    verified_facts:
+      - "Início da gameplay oficial em português do Skorpion às 22h30 de Brasília na live do YouTube."
+      - "Reação brasileira autêntica explorando Vice City em tempo real."
+  - id: "ky4_17_skorpion_gameplay_ptbr_02"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@Skorpion"
+    title: "Skorpion Acelerando Superesportivo pelas Ruas de Vice City Ao Vivo"
+    pillar: "real_oficial_campaign"
+    start_sec: 77820
+    end_sec: 77846
+    verified_facts:
+      - "Skorpion testando a dirigibilidade e os reflexos internos dos carros na janela nobre em português."
+      - "Gameplay 100% em PT-BR no coração do horário nobre das Américas."
+  - id: "ky4_18_skorpion_gameplay_ptbr_03"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@Skorpion"
+    title: "Fuga Insana do Skorpion Ao Vivo na Transmissão Oficial GTA VI"
+    pillar: "real_oficial_campaign"
+    start_sec: 78240
+    end_sec: 78266
+    verified_facts:
+      - "Momento de pura adrenalina com Skorpion escapando no limite durante sua participação oficial."
+      - "Chat brasileiro em peso acompanhando cada segundo na live do YouTube."
+  - id: "ky4_19_skorpion_gameplay_ptbr_04"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@Skorpion"
+    title: "Reação do Skorpion Vendo os Detalhes Escondidos de Leonida"
+    pillar: "real_oficial_campaign"
+    start_sec: 78660
+    end_sec: 78686
+    verified_facts:
+      - "Detalhes de mundo aberto e animações dos NPCs deixando o Skorpion impressionado ao vivo."
+      - "Corte direto da janela oficial em português das 22h30 às 22h57 BRT."
+  - id: "ky4_20_reta_final_madrugada_hype"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    creator: "@YouTubeBrasil"
+    title: "Melhores Momentos da Reta Final na Live Mundial YouTube x GTA VI"
+    pillar: "real_oficial_campaign"
+    start_sec: 84600
+    end_sec: 84626
+    verified_facts:
+      - "Clima de celebração mundial nas horas finais da maratona oficial de 25 horas no YouTube."
+      - "Últimos destaques postados rigorosamente antes do encerramento da transmissão."

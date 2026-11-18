@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 
+from gta6_agents.agents.live_campaign_ky4 import MANDATORY_PINNED_COMMENT
 from gta6_agents.config import AppConfig
 from gta6_agents.models import (
     ClipPlan,
@@ -28,6 +29,12 @@ TIKTOK_VIDEO_INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/
 TIKTOK_MAX_SINGLE_CHUNK = 64 * 1024 * 1024  # 64 MiB
 TIKTOK_DEFAULT_CHUNK = 10 * 1024 * 1024  # 10 MiB
 
+CAMPAIGN_VISIBILITY_AND_PIN_NOTE = (
+    f"IMPORTANTE: Mantenha curtidas e comentários PÚBLICOS, fixe (Pin) manualmente o primeiro "
+    f"comentário '{MANDATORY_PINNED_COMMENT}', NÃO arquive/exclua pelas 48h pós-live e "
+    "cadastre o link imediatamente no painel Real Oficial!"
+)
+
 
 class MetaTikTokPublisher:
     """Official Graph API Reels publisher & TikTok Content Posting API v2 publisher."""
@@ -35,6 +42,7 @@ class MetaTikTokPublisher:
     def __init__(self, config: AppConfig, timeout: float = 90.0) -> None:
         self.config = config
         self.timeout = timeout
+        self.last_publish_metadata: dict[str, Any] = {}
 
     @property
     def has_instagram_credentials(self) -> bool:
@@ -47,17 +55,66 @@ class MetaTikTokPublisher:
     def has_tiktok_credentials(self) -> bool:
         return bool(self.config.tiktok_access_token.strip())
 
+    @staticmethod
+    def _resolve_first_comment(plan: ClipPlan, first_comment: str | None = None) -> str:
+        if first_comment and first_comment.strip():
+            return first_comment.strip()
+        meta_first = str(plan.source.metadata.get("first_comment") or "").strip()
+        if meta_first:
+            return meta_first
+        if plan.for_real_oficial_campaign:
+            return str(
+                plan.source.metadata.get("mandatory_pinned_comment")
+                or MANDATORY_PINNED_COMMENT
+            ).strip()
+        return ""
+
+    async def post_instagram_first_comment(
+        self,
+        media_id: str,
+        message: str,
+        http: httpx.AsyncClient | None = None,
+    ) -> dict[str, Any]:
+        """Post the first comment on an Instagram Reel via Graph API `POST /{media_id}/comments`."""
+        comment_url = f"{IG_GRAPH_BASE_URL}/{media_id}/comments"
+        access_token = self.config.instagram_access_token.strip()
+        payload = {"message": message, "access_token": access_token}
+
+        if http is not None:
+            resp = await http.post(comment_url, data=payload)
+            resp.raise_for_status()
+            return resp.json() if resp.content else {}
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.post(comment_url, data=payload)
+            resp.raise_for_status()
+            return resp.json() if resp.content else {}
+
     async def publish_instagram_reel(
         self,
         plan: ClipPlan,
         clip: RenderedClip | None,
         copy: PlatformCopy,
+        first_comment: str | None = None,
     ) -> PublicationRecord:
-        """Publishes a Reel via `/{ig-user-id}/media` (`media_type=REELS`) -> `media_publish`."""
+        """Publishes a Reel via `/{ig-user-id}/media` (`media_type=REELS`) -> `media_publish` + `/{media_id}/comments`."""
         caption = copy.formatted_text()[:2200]
+        resolved_comment = self._resolve_first_comment(plan, first_comment)
 
         if self.config.dry_run:
             sim_id = f"dryrun_ig_{plan.id[-8:]}"
+            if resolved_comment:
+                sim_comment_id = f"dryrun_ig_cmt_{plan.id[-8:]}"
+                meta_notes = {
+                    "first_comment": resolved_comment,
+                    "first_comment_id": sim_comment_id,
+                    "first_comment_posted": True,
+                    "likes_and_comments_public": True,
+                    "pin_first_comment_required": True,
+                    "notes": CAMPAIGN_VISIBILITY_AND_PIN_NOTE,
+                }
+                plan.source.metadata.update(meta_notes)
+                self.last_publish_metadata = dict(meta_notes)
             return PublicationRecord(
                 plan_id=plan.id,
                 clip_id=clip.id if clip else None,
@@ -183,6 +240,41 @@ class MetaTikTokPublisher:
                 if perm_resp.is_success:
                     permalink = perm_resp.json().get("permalink")
 
+                # Step 5: Automatically post mandatory first comment via POST /{media_id}/comments
+                if resolved_comment:
+                    comment_id = ""
+                    comment_posted = False
+                    comment_err = ""
+                    try:
+                        cmt_data = await self.post_instagram_first_comment(
+                            media_id=media_id,
+                            message=resolved_comment,
+                            http=http,
+                        )
+                        comment_id = str(cmt_data.get("id", "")).strip()
+                        comment_posted = True
+                    except Exception as cmt_exc:
+                        comment_err = str(cmt_exc)
+                        logger.warning(
+                            "Instagram Reel %s published, but auto first-comment failed (%s). Post & pin '%s' manually!",
+                            media_id,
+                            cmt_exc,
+                            resolved_comment,
+                        )
+
+                    meta_notes_live: dict[str, Any] = {
+                        "first_comment": resolved_comment,
+                        "first_comment_id": comment_id,
+                        "first_comment_posted": comment_posted,
+                        "likes_and_comments_public": True,
+                        "pin_first_comment_required": True,
+                        "notes": CAMPAIGN_VISIBILITY_AND_PIN_NOTE,
+                    }
+                    if comment_err:
+                        meta_notes_live["first_comment_error"] = comment_err
+                    plan.source.metadata.update(meta_notes_live)
+                    self.last_publish_metadata = dict(meta_notes_live)
+
                 return PublicationRecord(
                     plan_id=plan.id,
                     clip_id=clip.id if clip else None,
@@ -211,9 +303,21 @@ class MetaTikTokPublisher:
         plan: ClipPlan,
         clip: RenderedClip | None,
         copy: PlatformCopy,
+        first_comment: str | None = None,
     ) -> PublicationRecord:
         """Publishes a video via Official TikTok Content Posting API `/v2/post/publish/video/init/`."""
         caption = copy.formatted_text()[:2200]
+        resolved_comment = self._resolve_first_comment(plan, first_comment)
+
+        if resolved_comment:
+            tt_meta = {
+                "tiktok_pinned_comment_required": resolved_comment,
+                "likes_and_comments_public": True,
+                "pin_first_comment_required": True,
+                "notes": CAMPAIGN_VISIBILITY_AND_PIN_NOTE,
+            }
+            plan.source.metadata.update(tt_meta)
+            self.last_publish_metadata = dict(tt_meta)
 
         if self.config.dry_run:
             sim_id = f"dryrun_tt_{plan.id[-8:]}"
@@ -341,11 +445,12 @@ class MetaTikTokPublisher:
         plan: ClipPlan,
         clip: RenderedClip | None,
         copy: PlatformCopy,
+        first_comment: str | None = None,
     ) -> PublicationRecord:
         if copy.platform == Platform.INSTAGRAM_REELS:
-            return await self.publish_instagram_reel(plan, clip, copy)
+            return await self.publish_instagram_reel(plan, clip, copy, first_comment=first_comment)
         if copy.platform == Platform.TIKTOK:
-            return await self.publish_tiktok(plan, clip, copy)
+            return await self.publish_tiktok(plan, clip, copy, first_comment=first_comment)
         return PublicationRecord(
             plan_id=plan.id,
             clip_id=clip.id if clip else None,

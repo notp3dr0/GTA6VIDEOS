@@ -65,6 +65,19 @@ class PublisherAgent:
         if platform in bundle.copies:
             return bundle.copies[platform]
 
+        if plan.for_real_oficial_campaign:
+            base_text = (plan.commentary_overlay or plan.hook_on_screen or plan.source.title).strip()
+            mandatory_phrase = "Assista ao vivo em youtube.com/youtube"
+            if mandatory_phrase not in base_text:
+                base_text = f"{base_text} {mandatory_phrase}".strip()
+            return PlatformCopy(
+                platform=platform,
+                title=plan.hook_on_screen,
+                caption=base_text,
+                hashtags=["#launchdayonYT"],
+                credit_line="",
+            )
+
         credit = (
             ""
             if plan.source.is_official

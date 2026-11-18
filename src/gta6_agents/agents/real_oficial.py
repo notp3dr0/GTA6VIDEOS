@@ -16,6 +16,17 @@ logger = logging.getLogger(__name__)
 VALID_YOUTUBE_HOSTS = frozenset(
     {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
 )
+VALID_INSTAGRAM_HOSTS = frozenset(
+    {"instagram.com", "www.instagram.com", "m.instagram.com"}
+)
+VALID_TIKTOK_HOSTS = frozenset(
+    {"tiktok.com", "www.tiktok.com", "m.tiktok.com", "vm.tiktok.com", "vt.tiktok.com"}
+)
+
+DEFAULT_CAMPAIGN_CPM_BRL = 4.00
+CAMPAIGN_REWARD_NOTE = (
+    "R$ 4,00/1k views above 5,000 views, max R$ 400/video, register immediately!"
+)
 
 
 def is_valid_public_youtube_url(url: str | None) -> bool:
@@ -35,6 +46,54 @@ def is_valid_public_youtube_url(url: str | None) -> bool:
         return bool(video_part)
     if parsed.path == "/watch" and "v=" in parsed.query:
         return True
+    return False
+
+
+def is_valid_public_instagram_url(url: str | None) -> bool:
+    """Validates that a URL is a public HTTPS Instagram Reel / Carousel permalink."""
+    if not url or not isinstance(url, str):
+        return False
+    parsed = urlparse(url.strip())
+    if parsed.scheme != "https":
+        return False
+    host = (parsed.hostname or "").lower()
+    if host not in VALID_INSTAGRAM_HOSTS:
+        return False
+    for prefix in ("/reel/", "/reels/", "/p/", "/tv/"):
+        if parsed.path.startswith(prefix):
+            code = parsed.path[len(prefix) :].strip("/")
+            return bool(code)
+    return False
+
+
+def is_valid_public_tiktok_url(url: str | None) -> bool:
+    """Validates that a URL is a public HTTPS TikTok video permalink."""
+    if not url or not isinstance(url, str):
+        return False
+    parsed = urlparse(url.strip())
+    if parsed.scheme != "https":
+        return False
+    host = (parsed.hostname or "").lower()
+    if host not in VALID_TIKTOK_HOSTS:
+        return False
+    path = parsed.path.strip("/")
+    if not path:
+        return False
+    if host in ("vm.tiktok.com", "vt.tiktok.com"):
+        return True
+    if "/video/" in parsed.path or "/photo/" in parsed.path or parsed.path.startswith("/t/"):
+        return True
+    return False
+
+
+def is_valid_campaign_post_url(url: str | None, platform: Platform | None = None) -> bool:
+    """Validates a public HTTPS TikTok or Instagram Reels URL for the Real Oficial KY4 campaign."""
+    if platform == Platform.INSTAGRAM_REELS:
+        return is_valid_public_instagram_url(url)
+    if platform == Platform.TIKTOK:
+        return is_valid_public_tiktok_url(url)
+    if platform is None:
+        return is_valid_public_instagram_url(url) or is_valid_public_tiktok_url(url)
     return False
 
 
@@ -64,6 +123,12 @@ class RealOficialAgent:
             .strip()
         )
         confirm_url = self.client.build_campaign_url(slug)
+        rewards_cfg = campaign_cfg.get("rewards", {}) if isinstance(campaign_cfg, dict) else {}
+        default_cpm = float(
+            rewards_cfg.get("cpm_brl_per_1k_views", DEFAULT_CAMPAIGN_CPM_BRL)
+            if isinstance(rewards_cfg, dict)
+            else DEFAULT_CAMPAIGN_CPM_BRL
+        )
 
         whoami_info = await self.client.whoami()
         championships_info = await self.client.list_championships()
@@ -86,7 +151,7 @@ class RealOficialAgent:
             st = str(row.get("status", "pending_submission"))
             by_status[st] = by_status.get(st, 0) + 1
             views = int(row.get("validated_views") or 0)
-            cpm = float(row.get("estimated_cpm_brl") or 1.25)
+            cpm = float(row.get("estimated_cpm_brl") or default_cpm)
             validated_views_total += views
             estimated_earnings_brl += (views / 1000.0) * cpm
 
@@ -98,6 +163,9 @@ class RealOficialAgent:
             "campaign_slug": slug,
             "confirm_url": confirm_url,
             "campaign_rules": campaign_cfg.get("rules", {}),
+            "authorized_live": campaign_cfg.get("authorized_live", {}),
+            "valid_platforms": campaign_cfg.get("valid_platforms", ["instagram_reels", "tiktok"]),
+            "rewards": rewards_cfg,
             "eligible_acervo_urls": campaign_cfg.get("eligible_acervo_urls", []),
             "scaling_plan": campaign_cfg.get("scaling_5_days", {}),
             "championships": championships_info.get("championships", []),
@@ -116,42 +184,55 @@ class RealOficialAgent:
             },
         }
 
-    async def register_youtube_short_in_campaign(
+    async def register_campaign_post(
         self,
         pub: PublicationRecord,
+        *,
+        _allow_legacy_youtube: bool = False,
     ) -> ChampionshipEntry:
-        """Registers a published (or dry-run) YouTube Short in the `gta-vi-youtube` championship.
+        """Registers a published (or dry-run) TikTok or Instagram Reel in the `gta-vi-youtube` championship.
 
-        Respects Real Oficial's explicit terms-acceptance requirement: if no token is configured,
-        running in dry-run, or `terms_required` is returned on preview, marks the entry as
-        `pending_submission` / `previewed` with the direct 1-click confirmation link.
+        Payout rules: R$ 4,00/1k views above 5,000 views, max R$ 400/video; register immediately after posting
+        and never delete, archive, or privatize for 48 hours after the live broadcast ends.
         """
+        cpm_brl = 4.00
         slug = (pub.campaign_slug or self.config.real_oficial_campaign_slug or "gta-vi-youtube").strip()
         confirm_link = self.client.build_campaign_url(slug)
 
-        if pub.platform != Platform.YOUTUBE_SHORTS or not is_valid_public_youtube_url(pub.public_url):
+        is_valid_url = is_valid_campaign_post_url(pub.public_url, pub.platform) or (
+            _allow_legacy_youtube
+            and pub.platform == Platform.YOUTUBE_SHORTS
+            and is_valid_public_youtube_url(pub.public_url)
+        )
+
+        if not is_valid_url:
             entry = ChampionshipEntry(
                 campaign_slug=slug,
                 publication_id=pub.id,
                 youtube_url=pub.public_url or "",
                 status="manual_action_needed",
+                estimated_cpm_brl=cpm_brl,
                 notes=(
-                    "Publication does not have a valid public YouTube Shorts HTTPS URL yet. "
-                    f"Submit manually in 1 click once live: {confirm_link}"
+                    f"Publication requires a valid public TikTok or Instagram Reels HTTPS URL "
+                    f"({CAMPAIGN_REWARD_NOTE}). Submit manually in 1 click once live: {confirm_link}"
                 ),
             )
             self.store.record_championship_entry(entry)
             return entry
 
-        youtube_url = str(pub.public_url).strip()
+        post_url = str(pub.public_url).strip()
 
         if not self.config.real_oficial_enabled:
             entry = ChampionshipEntry(
                 campaign_slug=slug,
                 publication_id=pub.id,
-                youtube_url=youtube_url,
+                youtube_url=post_url,
                 status="pending_submission",
-                notes=f"Real Oficial integration disabled in config. 1-click link: {confirm_link}",
+                estimated_cpm_brl=cpm_brl,
+                notes=(
+                    f"Real Oficial integration disabled in config ({CAMPAIGN_REWARD_NOTE}). "
+                    f"1-click link: {confirm_link}"
+                ),
             )
             self.store.record_championship_entry(entry)
             return entry
@@ -165,16 +246,20 @@ class RealOficialAgent:
             entry = ChampionshipEntry(
                 campaign_slug=slug,
                 publication_id=pub.id,
-                youtube_url=youtube_url,
+                youtube_url=post_url,
                 status="pending_submission",
-                notes=f"{reason}. Confirm entry in 1 click at: {confirm_link}",
+                estimated_cpm_brl=cpm_brl,
+                notes=(
+                    f"{reason} ({CAMPAIGN_REWARD_NOTE}). "
+                    f"Confirm entry in 1 click at: {confirm_link}"
+                ),
             )
             self.store.record_championship_entry(entry)
             return entry
 
         preview = await self.client.preview_championship_entry(
             campaign_slug=slug,
-            video_url=youtube_url,
+            video_url=post_url,
         )
 
         if preview.get("isError") or not preview.get("ok", True):
@@ -182,9 +267,13 @@ class RealOficialAgent:
             entry = ChampionshipEntry(
                 campaign_slug=slug,
                 publication_id=pub.id,
-                youtube_url=youtube_url,
+                youtube_url=post_url,
                 status="pending_submission",
-                notes=f"MCP preview failed ({err_msg}). Confirm in 1 click at: {confirm_link}",
+                estimated_cpm_brl=cpm_brl,
+                notes=(
+                    f"MCP preview failed ({err_msg}) — {CAMPAIGN_REWARD_NOTE} "
+                    f"Confirm in 1 click at: {confirm_link}"
+                ),
             )
             self.store.record_championship_entry(entry)
             return entry
@@ -199,11 +288,12 @@ class RealOficialAgent:
             entry = ChampionshipEntry(
                 campaign_slug=slug,
                 publication_id=pub.id,
-                youtube_url=youtube_url,
+                youtube_url=post_url,
                 status=status,
+                estimated_cpm_brl=cpm_brl,
                 notes=(
-                    f"Previewed ({preview_id or 'ready'}); explicit championship terms/1-click "
-                    f"confirmation required at: {confirm_link}"
+                    f"Previewed ({preview_id or 'ready'}) — {CAMPAIGN_REWARD_NOTE} "
+                    f"Explicit championship terms/1-click confirmation required at: {confirm_link}"
                 ),
             )
             self.store.record_championship_entry(entry)
@@ -217,23 +307,36 @@ class RealOficialAgent:
             entry = ChampionshipEntry(
                 campaign_slug=slug,
                 publication_id=pub.id,
-                youtube_url=youtube_url,
+                youtube_url=post_url,
                 status="submitted",
-                notes=f"Submitted via official Real Oficial MCP (preview_id={preview_id}). Panel: {confirm_link}",
+                estimated_cpm_brl=cpm_brl,
+                notes=(
+                    f"Submitted via official Real Oficial MCP (preview_id={preview_id}) — "
+                    f"{CAMPAIGN_REWARD_NOTE} Panel: {confirm_link}"
+                ),
             )
         else:
             entry = ChampionshipEntry(
                 campaign_slug=slug,
                 publication_id=pub.id,
-                youtube_url=youtube_url,
+                youtube_url=post_url,
                 status="previewed",
+                estimated_cpm_brl=cpm_brl,
                 notes=(
-                    f"Previewed (preview_id={preview_id}). Complete 1-click confirmation at: {confirm_link}"
+                    f"Previewed (preview_id={preview_id}) — {CAMPAIGN_REWARD_NOTE} "
+                    f"Complete 1-click confirmation at: {confirm_link}"
                 ),
             )
 
         self.store.record_championship_entry(entry)
         return entry
+
+    async def register_youtube_short_in_campaign(
+        self,
+        pub: PublicationRecord,
+    ) -> ChampionshipEntry:
+        """Backward-compatible wrapper delegating to `register_campaign_post`."""
+        return await self.register_campaign_post(pub, _allow_legacy_youtube=True)
 
     async def estimate_and_queue_cloud_clips(
         self,

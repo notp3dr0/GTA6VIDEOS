@@ -9,6 +9,11 @@ from typing import Any
 import httpx
 
 from gta6_agents.agents.compliance import sanitize_untrusted_video_text
+from gta6_agents.agents.live_campaign_ky4 import (
+    MANDATORY_CAPTION_PHRASE,
+    MANDATORY_ONLY_HASHTAG,
+    MANDATORY_PINNED_COMMENT,
+)
 from gta6_agents.config import AppConfig
 from gta6_agents.models import (
     CaptionBundle,
@@ -21,7 +26,18 @@ from gta6_agents.models import (
 )
 
 _HASHTAG_STRIP_RE = re.compile(r"#[\wÀ-ÿ]+")
+_HANDLE_OR_CREDIT_STRIP_RE = re.compile(r"(?:🎥\s*)?@[A-Za-z0-9_.-]+")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+")
+_CAMPAIGN_FORBIDDEN_TERMS_RE = re.compile(
+    r"\b(?:gta\s*(?:v|5|iv|4|iii|3)|san\s+andreas|los\s+santos|"
+    r"antes\s+d[eo]\s+gta\s*(?:6|vi)|before\s+gta\s*(?:6|vi)|"
+    r"tivemos\s+isso\s+antes|comparando\s+com\s+(?:o\s+)?gta|"
+    r"compara[cç][aã]o\s+com\s+(?:o\s+)?gta|"
+    r"samira\s+close|the\s+burnt\s+peanut|burnt\s*peanut|"
+    r"jogo\s+lixo|que\s+lixo|flopou|vai\s+flopar|horr[ií]vel|"
+    r"decep[cç][aã]o|decepcionante|downgrade|todo\s+bugado|cheio\s+de\s+bug)\b",
+    re.IGNORECASE,
+)
 
 
 def _ensure_at_handle(handle: str) -> str:
@@ -44,6 +60,22 @@ def _truncate_clean(text: str, max_len: int) -> str:
 def _strip_hashtags(text: str) -> str:
     no_tags = _HASHTAG_STRIP_RE.sub("", text)
     return re.sub(r"[ \t]+", " ", no_tags).strip()
+
+
+def _clean_campaign_text(text: str, max_len: int = 120) -> str:
+    """Remove hashtags, @handles/logos, old-GTA comparisons, and negative slang from campaign text."""
+    cleaned = sanitize_untrusted_video_text(text, max_length=max_len * 2)
+    cleaned = _HASHTAG_STRIP_RE.sub(" ", cleaned)
+    cleaned = _HANDLE_OR_CREDIT_STRIP_RE.sub(" ", cleaned)
+    cleaned = _CAMPAIGN_FORBIDDEN_TERMS_RE.sub(" ", cleaned)
+    cleaned = re.sub(
+        r"assista\s+ao\s+vivo\s+em\s+youtube\.com/youtube",
+        " ",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -—:,;|")
+    return _truncate_clean(cleaned, max_len) if cleaned else ""
 
 
 def build_subtitle_cues(voiceover_script: str, duration_sec: float) -> list[SubtitleCue]:
@@ -128,6 +160,9 @@ class ScriptCopyAgent:
         self._external_client = http_client
 
     def _resolve_language(self, explicit_lang: str | None, for_campaign: bool) -> str:
+        if for_campaign:
+            return "pt-BR"
+
         if explicit_lang and explicit_lang.strip():
             norm = explicit_lang.strip()
             if norm.lower().startswith("pt"):
@@ -136,20 +171,15 @@ class ScriptCopyAgent:
                 return "en-US"
             return norm
 
-        if for_campaign:
-            camp_raw = self.config.campaign or {}
-            camp_block = camp_raw.get("campaign", camp_raw) if isinstance(camp_raw, dict) else {}
-            camp_lang = camp_block.get("language") if isinstance(camp_block, dict) else None
-            if isinstance(camp_lang, str) and camp_lang.strip():
-                return camp_lang.strip()
-            return "pt-BR"
-
         page_cfg = (self.config.settings or {}).get("page", {})
         if isinstance(page_cfg, dict) and page_cfg.get("primary_language"):
             return str(page_cfg["primary_language"]).strip()
         return "pt-BR"
 
     def _resolve_target_platforms(self, is_campaign: bool) -> list[Platform]:
+        if is_campaign:
+            return [Platform.INSTAGRAM_REELS, Platform.TIKTOK]
+
         platforms_cfg = (self.config.settings or {}).get("platforms", {})
         selected: list[Platform] = []
 
@@ -170,10 +200,8 @@ class ScriptCopyAgent:
             if enabled:
                 selected.append(enum_val)
 
-        if is_campaign and Platform.YOUTUBE_SHORTS not in selected:
-            selected.insert(0, Platform.YOUTUBE_SHORTS)
         if not selected:
-            selected = [Platform.YOUTUBE_SHORTS, Platform.INSTAGRAM_REELS, Platform.TIKTOK, Platform.X]
+            selected = [Platform.INSTAGRAM_REELS, Platform.TIKTOK, Platform.YOUTUBE_SHORTS]
         return selected
 
     def _campaign_rules(self) -> dict[str, Any]:
@@ -301,7 +329,32 @@ class ScriptCopyAgent:
         pillar: ContentPillar,
         language: str,
         spoiler: bool,
+        is_campaign: bool = False,
     ) -> tuple[str, str, str]:
+        if is_campaign:
+            camp_topic = _clean_campaign_text(clean_title, 42) or "Momento épico em Leonida"
+            raw_fact = clean_facts[0] if clean_facts else clean_summary
+            camp_fact = (
+                _clean_campaign_text(raw_fact, 130)
+                or "Reação incrível ao vivo explorando Vice City e Leonida no GTA VI"
+            )
+            camp_secondary = (
+                _clean_campaign_text(clean_facts[1], 110) if len(clean_facts) > 1 else ""
+            )
+            hook = _truncate_clean(f"AO VIVO NO GTA VI: {camp_topic}", 60)
+            vo_parts_camp = [
+                f"Olha essa reação insana ao vivo em {camp_topic}!",
+                camp_fact.rstrip(".") + ".",
+            ]
+            if camp_secondary:
+                vo_parts_camp.append(camp_secondary.rstrip(".") + ".")
+            vo_parts_camp.append(
+                "O nível de imersão em Vice City está simplesmente surreal!"
+            )
+            voiceover = " ".join(vo_parts_camp)
+            overlay = _truncate_clean(f"Destaque ao vivo • {camp_fact}", 100)
+            return hook, voiceover, overlay
+
         is_pt = language.lower().startswith("pt")
         topic_short = _truncate_clean(_strip_hashtags(clean_title), 54)
         primary_fact = (
@@ -323,19 +376,19 @@ class ScriptCopyAgent:
             pillar_hooks: dict[ContentPillar, str] = {
                 ContentPillar.OFFICIAL_NEWS: f"OFICIAL NO GTA 6: {topic_short}",
                 ContentPillar.TIPS_TUTORIALS: f"DICA DE GTA 6: {topic_short}",
-                ContentPillar.GAMEPLAY_CLIPS: f"REPAROU NESSA FÍSICA? {topic_short}",
+                ContentPillar.GAMEPLAY_CLIPS: f"CORTE DA LIVE DE GTA 6: {topic_short}",
                 ContentPillar.GTA5_NOSTALGIA: f"13 ANOS DE EVOLUÇÃO: {topic_short}",
                 ContentPillar.SPOTLIGHTS: f"RAIO-X DE LEONIDA: {topic_short}",
                 ContentPillar.COUNTDOWN_RECAP: f"RESUMO GTA 6: {topic_short}",
                 ContentPillar.QUESTIONS: f"QUAL SUA ESCOLHA EM LEONIDA? {topic_short}",
-                ContentPillar.REAL_OFICIAL_CAMPAIGN: f"DETALHE INSANO NO GTA 6: {topic_short}",
+                ContentPillar.REAL_OFICIAL_CAMPAIGN: f"AO VIVO NO GTA VI: {topic_short}",
             }
             hook = _truncate_clean(pillar_hooks.get(pillar, f"GTA 6: {topic_short}"), 64)
             if spoiler and not hook.upper().startswith("⚠️ SPOILER"):
                 hook = _truncate_clean(f"⚠️ SPOILER — {hook}", 64)
 
             vo_parts = [
-                f"Olha esse detalhe em {topic_short}.",
+                f"Olha esse momento em {topic_short}.",
                 primary_fact.rstrip(".") + ".",
             ]
             if secondary_fact:
@@ -354,7 +407,7 @@ class ScriptCopyAgent:
                 ContentPillar.SPOTLIGHTS: f"INSIDE LEONIDA: {topic_short}",
                 ContentPillar.COUNTDOWN_RECAP: f"GTA 6 VERIFIED RECAP: {topic_short}",
                 ContentPillar.QUESTIONS: f"WHAT IS YOUR DAY-1 MOVE? {topic_short}",
-                ContentPillar.REAL_OFICIAL_CAMPAIGN: f"HIDDEN GTA 6 TRAILER DETAIL: {topic_short}",
+                ContentPillar.REAL_OFICIAL_CAMPAIGN: f"LIVE GTA VI HIGHLIGHT: {topic_short}",
             }
             hook = _truncate_clean(pillar_hooks_en.get(pillar, f"GTA 6: {topic_short}"), 64)
             if spoiler and not hook.upper().startswith("⚠️ SPOILER"):
@@ -381,7 +434,11 @@ class ScriptCopyAgent:
         for_campaign: bool = False,
     ) -> ClipPlan:
         """Create a transformative ClipPlan with hook, voiceover script, and timed SubtitleCues."""
-        is_campaign = bool(for_campaign or source.is_campaign_acervo)
+        is_campaign = bool(
+            for_campaign
+            or source.is_campaign_acervo
+            or source.pillar == ContentPillar.REAL_OFICIAL_CAMPAIGN
+        )
         lang = self._resolve_language(language, is_campaign)
         pillar = ContentPillar.REAL_OFICIAL_CAMPAIGN if is_campaign else source.pillar
         campaign_slug = (
@@ -389,7 +446,10 @@ class ScriptCopyAgent:
             if is_campaign
             else None
         )
-        spoiler_required = bool(source.contains_spoiler)
+        spoiler_required = bool(source.contains_spoiler) and not is_campaign
+
+        if is_campaign:
+            source.metadata["mandatory_pinned_comment"] = MANDATORY_PINNED_COMMENT
 
         clean_title = sanitize_untrusted_video_text(source.title, max_length=160)
         clean_summary = sanitize_untrusted_video_text(source.summary, max_length=400)
@@ -420,16 +480,27 @@ class ScriptCopyAgent:
             pillar=pillar,
             language=lang,
             spoiler=spoiler_required,
+            is_campaign=is_campaign,
         )
 
         # Optional LLM enhancement with strict validation fallback
-        llm_data = await self._call_llm_json(
-            system_prompt=(
+        if is_campaign:
+            sys_prompt = (
+                "Você escreve roteiros curtos em PT-BR para cortes oficiais da Live YouTube x GTA VI. "
+                "Tom 100% positivo e empolgado. PROIBIDO mencionar GTA V/5, San Andreas, Los Santos, "
+                "'antes do GTA 6', críticas/bugs, arrobas (@), logos ou hashtags. Retorne JSON com: "
+                "hook_on_screen (<=56 chars, gancho de 2s), voiceover_script (30-55 palavras), commentary_overlay (<=95 chars)."
+            )
+        else:
+            sys_prompt = (
                 "You write transformative short-form GTA 6 video scripts for a fan commentary page "
                 "(not affiliated with Rockstar Games). Never claim unverified leaks, never say "
                 "'this confirms' or '100% confirmed' or 'we at Rockstar'. Return JSON with keys: "
                 "hook_on_screen (<=60 chars), voiceover_script (35-65 words), commentary_overlay (<=100 chars)."
-            ),
+            )
+
+        llm_data = await self._call_llm_json(
+            system_prompt=sys_prompt,
             user_prompt=(
                 f"Language: {lang}\nPillar: {pillar.value}\nTitle: {clean_title}\n"
                 f"Summary: {clean_summary}\nVerified facts: {clean_facts}\n"
@@ -440,7 +511,13 @@ class ScriptCopyAgent:
             cand_hook = sanitize_untrusted_video_text(str(llm_data.get("hook_on_screen", "")), max_length=64)
             cand_vo = sanitize_untrusted_video_text(str(llm_data.get("voiceover_script", "")), max_length=600)
             cand_ov = sanitize_untrusted_video_text(str(llm_data.get("commentary_overlay", "")), max_length=110)
-            if cand_hook and cand_vo and not self._contains_unsafe_phrasing(f"{cand_hook} {cand_vo} {cand_ov}"):
+            if is_campaign:
+                cand_hook = _clean_campaign_text(cand_hook, 60)
+                cand_vo = _clean_campaign_text(cand_vo, 500)
+                cand_ov = _clean_campaign_text(cand_ov, 100)
+            if cand_hook and cand_vo and not self._contains_unsafe_phrasing(
+                f"{cand_hook} {cand_vo} {cand_ov}", for_campaign=is_campaign
+            ):
                 if spoiler_required and "SPOILER" not in cand_hook.upper():
                     cand_hook = _truncate_clean(f"⚠️ SPOILER — {cand_hook}", 64)
                 hook = cand_hook
@@ -467,16 +544,60 @@ class ScriptCopyAgent:
         )
 
     @staticmethod
-    def _contains_unsafe_phrasing(text: str) -> bool:
-        return bool(
-            re.search(
-                r"\b(?:this\s+confirms|100%\s+confirmed|secret\s+insider|isso\s+confirma|"
-                r"100%\s+confirmado|fonte\s+secreta|we\s+at\s+rockstar|n[oó]s\s+da\s+rockstar|"
-                r"leak|leaked|datamine|datamined|vazamento)\b",
-                text,
-                re.IGNORECASE,
-            )
+    def _contains_unsafe_phrasing(text: str, for_campaign: bool = False) -> bool:
+        if re.search(
+            r"\b(?:this\s+confirms|100%\s+confirmed|secret\s+insider|isso\s+confirma|"
+            r"100%\s+confirmado|fonte\s+secreta|we\s+at\s+rockstar|n[oó]s\s+da\s+rockstar|"
+            r"leak|leaked|datamine|datamined|vazamento)\b",
+            text,
+            re.IGNORECASE,
+        ):
+            return True
+        if for_campaign and _CAMPAIGN_FORBIDDEN_TERMS_RE.search(text):
+            return True
+        return False
+
+    def _build_campaign_copies(self, plan: ClipPlan, llm_hook: str = "") -> dict[Platform, PlatformCopy]:
+        """Build strict Rule #10 Real Oficial KY4DWumZffg copies for Instagram Reels & TikTok ONLY."""
+        base_hook = _clean_campaign_text(llm_hook or plan.hook_on_screen, 72)
+        if not base_hook:
+            base_hook = _clean_campaign_text(plan.source.title, 72) or "Momento épico ao vivo no GTA VI!"
+
+        detail_source = (
+            plan.source.verified_facts[0]
+            if plan.source.verified_facts
+            else (plan.source.summary or plan.source.title)
         )
+        detail_clean = _clean_campaign_text(detail_source, 72)
+        if detail_clean and detail_clean.lower() not in base_hook.lower():
+            positive_live_hook = _truncate_clean(f"{base_hook} — {detail_clean}", 140)
+        else:
+            positive_live_hook = base_hook
+
+        positive_live_hook = positive_live_hook.rstrip(" -—:,;")
+        campaign_caption = (
+            f"{positive_live_hook} {MANDATORY_CAPTION_PHRASE} {MANDATORY_ONLY_HASHTAG}"
+        )
+        campaign_title = _truncate_clean(positive_live_hook, 70)
+
+        reels_copy = PlatformCopy(
+            platform=Platform.INSTAGRAM_REELS,
+            title=campaign_title,
+            caption=campaign_caption,
+            hashtags=[MANDATORY_ONLY_HASHTAG],
+            credit_line="",
+        )
+        tiktok_copy = PlatformCopy(
+            platform=Platform.TIKTOK,
+            title=campaign_title,
+            caption=campaign_caption,
+            hashtags=[MANDATORY_ONLY_HASHTAG],
+            credit_line="",
+        )
+        return {
+            Platform.INSTAGRAM_REELS: reels_copy,
+            Platform.TIKTOK: tiktok_copy,
+        }
 
     def _deterministic_copies(self, plan: ClipPlan) -> dict[Platform, PlatformCopy]:
         is_pt = plan.language.lower().startswith("pt")
@@ -567,9 +688,9 @@ class ScriptCopyAgent:
 
         # 4. YouTube Shorts: High-CTR title (<= 70 chars) + description with 🎥 @creator + #GTA6 #GTAVI #Shorts
         rules = self._campaign_rules()
-        req_tags_raw = rules.get("required_hashtags", ["#GTA6", "#GTAVI", "#Shorts"])
+        req_tags_raw = ["#GTA6", "#GTAVI", "#Shorts"]
         yt_tags: list[str] = []
-        for t in list(req_tags_raw) + ["#GTA6", "#GTAVI", "#Shorts"]:
+        for t in req_tags_raw:
             tag = t if str(t).startswith("#") else f"#{t}"
             if tag.lower() not in {existing.lower() for existing in yt_tags}:
                 yt_tags.append(tag)
@@ -627,10 +748,57 @@ class ScriptCopyAgent:
         }
 
     async def generate_captions(self, plan: ClipPlan) -> CaptionBundle:
-        """Generate Section 7 platform-native captions and populate subtitles if missing."""
+        """Generate Section 7 platform-native captions (or strict Rule #10 KY4 campaign copies)."""
         duration = max(1.0, plan.end_sec - plan.start_sec)
         if not plan.subtitles and plan.voiceover_script.strip():
             plan.subtitles = build_subtitle_cues(plan.voiceover_script, duration)
+
+        if plan.for_real_oficial_campaign:
+            plan.language = "pt-BR"
+            plan.source.metadata["mandatory_pinned_comment"] = MANDATORY_PINNED_COMMENT
+
+            llm_hook = ""
+            llm_camp = await self._call_llm_json(
+                system_prompt=(
+                    "Você cria um gancho curto e super positivo em PT-BR (máx 90 caracteres) sobre um corte "
+                    "da Live Oficial YouTube x GTA VI. PROIBIDO usar hashtags (#), arrobas (@), logos, "
+                    "comparações com GTA V/San Andreas/'antes do GTA 6' ou críticas. "
+                    "Retorne JSON: {\"positive_live_hook\": \"...\"}"
+                ),
+                user_prompt=(
+                    f"Título: {sanitize_untrusted_video_text(plan.source.title, 120)}\n"
+                    f"Hook da tela: {sanitize_untrusted_video_text(plan.hook_on_screen, 80)}\n"
+                    f"Fatos: {plan.source.verified_facts}"
+                ),
+                tier="hydrogen",
+            )
+            if llm_camp:
+                candidate_hook = _clean_campaign_text(
+                    str(llm_camp.get("positive_live_hook", "")), 95
+                )
+                if candidate_hook and not self._contains_unsafe_phrasing(
+                    candidate_hook, for_campaign=True
+                ):
+                    llm_hook = candidate_hook
+
+            camp_copies = self._build_campaign_copies(plan, llm_hook=llm_hook)
+            valid_requested = [
+                p
+                for p in plan.target_platforms
+                if p in (Platform.INSTAGRAM_REELS, Platform.TIKTOK)
+            ]
+            if not valid_requested:
+                valid_requested = [Platform.INSTAGRAM_REELS, Platform.TIKTOK]
+            else:
+                # Ensure both campaign networks have ready-to-publish copies
+                for req_p in (Platform.INSTAGRAM_REELS, Platform.TIKTOK):
+                    if req_p not in valid_requested:
+                        valid_requested.append(req_p)
+
+            return CaptionBundle(
+                plan_id=plan.id,
+                copies={p: camp_copies[p] for p in valid_requested if p in camp_copies},
+            )
 
         base_copies = self._deterministic_copies(plan)
         creator = _ensure_at_handle(plan.source.creator_handle)

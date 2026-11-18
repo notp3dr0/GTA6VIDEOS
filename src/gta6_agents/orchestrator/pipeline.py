@@ -65,7 +65,7 @@ class MultiAgentOrchestrator:
         self.config = config
         self.store = store or StateStore(data_dir=config.data_dir, memory_dir=config.memory_dir)
 
-        # 7 specialized agents + mobile notifier
+        # 7 specialized agents + mobile notifier + 5-channel matrix + 3-AI pool
         self.scout = _instantiate_agent(ScoutAgent, self.config, self.store)
         self.copywriter = _instantiate_agent(ScriptCopyAgent, self.config, self.store)
         self.compliance = _instantiate_agent(ComplianceFactAgent, self.config, self.store)
@@ -74,6 +74,23 @@ class MultiAgentOrchestrator:
         self.real_oficial = _instantiate_agent(RealOficialAgent, self.config, self.store)
         self.analytics = AnalyticsLearningAgent(self.config, self.store)
         self.notifier = RemoteNotifier(self.config, self.store)
+
+        from gta6_agents.orchestrator.multi_channel import MultiChannelCoordinator
+        from gta6_agents.orchestrator.tri_engine_pool import TriEnginePool
+
+        try:
+            self.multi_channel: MultiChannelCoordinator | None = MultiChannelCoordinator(
+                self.config, self.store
+            )
+        except Exception as exc:
+            logger.warning("MultiChannelCoordinator init fallback: %s", exc)
+            self.multi_channel = None
+
+        try:
+            self.tri_engine_pool: TriEnginePool | None = TriEnginePool(self.config, self.store)
+        except Exception as exc:
+            logger.warning("TriEnginePool init fallback: %s", exc)
+            self.tri_engine_pool = None
 
         # Concurrency semaphores tuned for 2nd PC autonomous execution
         self.worker_semaphore = asyncio.BoundedSemaphore(3)
@@ -84,6 +101,21 @@ class MultiAgentOrchestrator:
         if isinstance(page_cfg, dict) and page_cfg.get("primary_language"):
             return str(page_cfg["primary_language"])
         return "pt-BR"
+
+    def _valid_campaign_platforms(self) -> set[Platform]:
+        raw_campaign = self.config.campaign if isinstance(self.config.campaign, dict) else {}
+        block = raw_campaign.get("campaign", raw_campaign) if isinstance(raw_campaign, dict) else {}
+        configured = block.get("valid_platforms") if isinstance(block, dict) else None
+        if isinstance(configured, list) and configured:
+            valid: set[Platform] = set()
+            for p_raw in configured:
+                try:
+                    valid.add(Platform(str(p_raw).strip()))
+                except ValueError:
+                    continue
+            if valid:
+                return valid
+        return {Platform.INSTAGRAM_REELS, Platform.TIKTOK}
 
     async def _evaluate_compliance(
         self, plan: ClipPlan, bundle: CaptionBundle
@@ -99,7 +131,7 @@ class MultiAgentOrchestrator:
         bundle: CaptionBundle,
         demo_video_fallback: bool,
     ) -> dict[str, Any]:
-        """Render vertical 1080x1920 Short, publish to target platforms, and register in gta-vi-youtube."""
+        """Render vertical 1080x1920 clip, publish to target platforms, and immediately register in Real Oficial."""
         async with self.render_semaphore:
             clip = await self.clipper.render_clip_plan(
                 plan,
@@ -108,14 +140,22 @@ class MultiAgentOrchestrator:
 
         publications = await self.publisher.publish_all(plan, clip, bundle)
 
+        valid_campaign_platforms = self._valid_campaign_platforms()
+        register_fn = getattr(
+            self.real_oficial,
+            "register_campaign_post",
+            self.real_oficial.register_youtube_short_in_campaign,
+        )
+
         entries: list[ChampionshipEntry] = []
         for pub in publications:
             if (
-                pub.platform == Platform.YOUTUBE_SHORTS
-                and (plan.for_real_oficial_campaign or self.config.real_oficial_enabled)
+                pub.platform in valid_campaign_platforms
+                and plan.for_real_oficial_campaign
+                and self.config.real_oficial_enabled
                 and pub.status != "failed"
             ):
-                entry = await self.real_oficial.register_youtube_short_in_campaign(pub)
+                entry = await register_fn(pub)
                 if entry is not None:
                     entries.append(entry)
                     await self.notifier.notify_campaign_entry(entry, pub)
@@ -178,15 +218,31 @@ class MultiAgentOrchestrator:
         """Run ScriptCopyAgent -> ComplianceFactAgent -> ClipperEditorAgent -> PublisherAgent -> RealOficialAgent."""
         async with self.worker_semaphore:
             try:
-                for_campaign = bool(
-                    include_campaign
-                    and self.config.real_oficial_enabled
-                    and (
+                raw_campaign = self.config.campaign if isinstance(self.config.campaign, dict) else {}
+                c_block = raw_campaign.get("campaign", raw_campaign) if isinstance(raw_campaign, dict) else {}
+                only_auth_live = bool(
+                    isinstance(c_block, dict)
+                    and c_block.get("rules", {}).get("only_authorized_live_source", False)
+                )
+                if only_auth_live:
+                    eligible_source = (
+                        "KY4DWumZffg" in source.url
+                        or source.is_campaign_acervo
+                        or source.pillar == ContentPillar.REAL_OFICIAL_CAMPAIGN
+                        or bool(source.campaign_slug)
+                    )
+                else:
+                    eligible_source = (
                         source.is_campaign_acervo
                         or source.is_official
                         or source.pillar == ContentPillar.REAL_OFICIAL_CAMPAIGN
                         or bool(source.campaign_slug)
                     )
+
+                for_campaign = bool(
+                    include_campaign
+                    and self.config.real_oficial_enabled
+                    and eligible_source
                 )
                 language = "pt-BR" if for_campaign else self._primary_language()
 

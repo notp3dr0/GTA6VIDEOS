@@ -166,7 +166,7 @@ def status() -> None:
     est_brl = round(
         sum(
             (int(e.get("validated_views") or 0) / 1000.0)
-            * float(e.get("estimated_cpm_brl") or 1.25)
+            * float(e.get("estimated_cpm_brl") or 4.00)
             for e in entries
         ),
         2,
@@ -204,14 +204,21 @@ def status() -> None:
     health_table.add_row(
         f"LLM ({config.llm_provider}:{config.llm_model})",
         _badge(llm_has_key, "API KEY SET", "TEMPLATE FALLBACK"),
-        "Deterministic PT-BR/EN fallback ready if key unset",
+        "Tri-Engine Pool (Claude Pro + Codex Plus + Antigravity Ultra) + PT-BR fallback",
     )
 
     ro_has_auth = bool(config.real_oficial_api_key or config.real_oficial_mcp_token)
     health_table.add_row(
         "Real Oficial API / MCP",
         _badge(ro_has_auth, "CONNECTED", "1-CLICK QUEUE MODE"),
-        f"Slug: {config.real_oficial_campaign_slug} | Credits: {credits_today}/{config.real_oficial_daily_credit_limit}",
+        f"Slug: {config.real_oficial_campaign_slug} | Source: KY4DWumZffg | Credits: {credits_today}/{config.real_oficial_daily_credit_limit}",
+    )
+
+    ig_tt_ready = bool(config.instagram_access_token or config.tiktok_access_token)
+    health_table.add_row(
+        "TikTok + Instagram Reels",
+        _badge(ig_tt_ready, "API READY", "DRY-RUN / LAUNCHER"),
+        f"IG={bool(config.instagram_access_token)} | TikTok={bool(config.tiktok_access_token)} (Campanha paga R$ 4/1k > 5k views)",
     )
 
     yt_has_auth = bool(
@@ -219,15 +226,8 @@ def status() -> None:
     )
     health_table.add_row(
         "YouTube Data API v3",
-        _badge(yt_has_auth, "OAUTH READY", "DRY-RUN / UNSET"),
-        f"Enabled={config.youtube_enabled} | Channel={config.youtube_channel_handle or 'not set'}",
-    )
-
-    x_has_auth = bool(config.x_api_key and config.x_access_token)
-    health_table.add_row(
-        "X (Twitter) API v2",
-        _badge(x_has_auth, "OAUTH READY", "OPTIONAL / UNSET"),
-        f"Enabled={config.x_enabled} (6 daily text slots)",
+        _badge(yt_has_auth, "OAUTH READY", "POS-LIVE / UNSET"),
+        f"Enabled={config.youtube_enabled} | Channel={config.youtube_channel_handle or '5-channel matrix'}",
     )
 
     tg_ready = bool(config.telegram_bot_token and config.telegram_chat_id)
@@ -240,7 +240,6 @@ def status() -> None:
     console.print(health_table)
 
     campaign_cfg = (config.campaign or {}).get("campaign", {})
-    scaling_cfg = campaign_cfg.get("scaling_5_days", {}) if isinstance(campaign_cfg, dict) else {}
     rules_cfg = campaign_cfg.get("rules", {}) if isinstance(campaign_cfg, dict) else {}
     camp_url = campaign_cfg.get(
         "campaign_url",
@@ -253,12 +252,12 @@ def status() -> None:
     db_table.add_row("SQLite State DB", str(store.db_path))
     db_table.add_row("Campaign URL", str(camp_url))
     db_table.add_row(
-        "Daily Shorts Schedule (BRT)",
-        ", ".join(scaling_cfg.get("preferred_times_brt", ["10:00", "14:00", "18:00", "21:30"])),
+        "5-Channel Matrix (BRT)",
+        "5 páginas PT-BR × 12 cortes/dia = 60 cortes/dia (120 posts TikTok + Reels; Turbo Skorpion 22:30-22:57)",
     )
     db_table.add_row(
-        "Required Hashtags",
-        " ".join(rules_cfg.get("required_hashtags", ["#GTA6", "#GTAVI", "#Shorts"])),
+        "Required Hashtag (Exclusive)",
+        " ".join(rules_cfg.get("required_hashtags", ["#launchdayonYT"])),
     )
     db_table.add_row("Seen Sources (Deduplicated)", str(seen_count))
     db_table.add_row("Total Publications", str(len(pubs)))

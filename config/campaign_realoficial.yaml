@@ -1,42 +1,121 @@
+# ==============================================================================
+# REGULAMENTO EXATO — CAMPEONATO REAL OFICIAL: LIVE YOUTUBE x GTA VI
+# URL do Painel: https://app.realoficial.com.br/c/gta-vi-youtube?ro_vid=a56ec50b-725e-4c73-a353-4e3b2e80678b
+# ==============================================================================
 campaign:
   platform: "Real Oficial (Real Rewards)"
   slug: "gta-vi-youtube"
   campaign_url: "https://app.realoficial.com.br/c/gta-vi-youtube?ro_vid=a56ec50b-725e-4c73-a353-4e3b2e80678b&fbp=fb.2.1795018619635.489703140607791075"
   referral_vid: "a56ec50b-725e-4c73-a353-4e3b2e80678b"
-  target_network: "youtube_shorts"
   language: "pt-BR"
+  content_mode: "live_stream_cuts_only"
 
-  # Regras e requisitos da campanha (atualize com o regulamento exato exibido no painel da campanha!)
+  # UNICA FONTE AUTORIZADA NA CAMPANHA (qualquer imagem/clipe de fora e RECUSADO!)
+  authorized_live:
+    video_id: "KY4DWumZffg"
+    url: "https://www.youtube.com/watch?v=KY4DWumZffg"
+    title: "Live Oficial YouTube x GTA VI (25 Horas)"
+    allow_any_other_source: false
+    allow_dubbing_and_subtitles_ptbr: true
+
+  # JANELA ESTRITA DE POSTAGEM E CONTAGEM (Horario de Brasilia - America/Sao_Paulo)
+  schedule_brt:
+    timezone: "America/Sao_Paulo"
+    live_start_iso: "2026-11-19T01:00:00-03:00"      # Quinta 19/11 01h00 BRT
+    hard_stop_post_iso: "2026-11-20T01:57:00-03:00"  # Trava 3 min antes das 02h00 p/ nenhum upload cair pos-live!
+    live_end_iso: "2026-11-20T02:00:00-03:00"        # Sexta 20/11 02h00 BRT
+    views_count_until_iso: "2026-11-22T02:00:00-03:00" # Domingo 22/11 02h00 BRT (+48h)
+    prime_time_brt:
+      start: "19:00"
+      end: "23:59"
+    ptbr_highlight_windows:
+      - name: "Podcast Passaporte pra Vice City (Skorpion & Gamer Costa - CUIDADO SAMIRA CLOSE!)"
+        start_iso: "2026-11-19T07:04:00-03:00"
+        end_iso: "2026-11-19T08:10:00-03:00"
+        require_strict_vision_no_samira: true
+        hold_for_telegram_visual_confirm_when_away: true
+      - name: "Gameplay do Skorpion em Portugues (OURO PURO - TURBO MAXIMO!)"
+        start_iso: "2026-11-19T22:30:00-03:00"
+        end_iso: "2026-11-19T22:57:00-03:00"
+        burst_multiplier: 3
+
+  # BLOQUEIOS ABSOLUTOS DE IMAGEM / CRIADORES NAO AUTORIZADOS
+  forbidden_appearances:
+    - name: "Samira Close"
+      danger_window_start_iso: "2026-11-19T07:02:00-03:00"
+      danger_window_end_iso: "2026-11-19T08:12:00-03:00"
+      policy: "zero_seconds_on_screen_vision_gate"
+      keywords: ["samira close", "samira", "apresentadora"]
+    - name: "The Burnt Peanut"
+      danger_window_start_iso: "2026-11-19T20:00:00-03:00"
+      danger_window_end_iso: "2026-11-19T20:34:00-03:00"
+      policy: "hard_time_and_keyword_blackout"
+      keywords: ["the burnt peanut", "burnt peanut", "burntpeanut"]
+
+  # PLATAFORMAS VALIDAS QUE PAGAM NA CAMPANHA (TikTok e Instagram Reels/Carrossel!)
+  valid_platforms:
+    - "instagram_reels"
+    - "tiktok"
+  invalid_platforms:
+    - "kwai"
+    - "youtube_shorts"
+    - "x"
+
+  # PREMIACAO E METAS FINANCEIRAS
+  rewards:
+    cpm_brl_per_1k_views: 4.00
+    min_views_threshold_per_video: 5000
+    max_payout_brl_per_video: 400.00
+    total_cash_pool_brl: 20000.00
+    total_prize_pool_brl: 25500.00
+    top_10_bonus: "1 Key oficial de GTA VI para cada um do TOP 10"
+    register_immediately_after_post: true
+    never_delete_archive_or_private: true
+
+  # REGRAS OBRIGATORIAS DO CHECKLIST (13 ITENS — QUEBROU 1, CORTE RECUSADO)
   rules:
     must_be_public: true
-    no_third_party_watermarks: true
-    clean_normalized_audio: true
-    burned_in_legible_captions: true
+    likes_and_comments_enabled: true
+    only_authorized_live_source: true
+    only_post_while_live_on_air: true
+    no_samira_close: true
+    no_the_burnt_peanut: true
+    no_old_gta_or_comparisons: true       # Zero GTA V, San Andreas, Vice City antigo ou "antes do GTA 6"
+    no_ai_generated_clips: true           # Zero Real Xablau / video IA / contexto falso
+    positive_hype_only: true              # Zero crítica, zoação negativa, reclamar de bug
+    no_impersonation: true                # Nunca se passar por Rockstar, YouTube ou criador
+    no_logos_or_watermarks_at_all: true   # ZERO logo do canal e ZERO marca d'agua no video!
+    no_extra_hashtags: true               # PROIBIDO qualquer hashtag alem de #launchdayonYT!
+    no_music_lyrics_on_screen: true
+    commercial_music_library_only: true
+    no_paid_boost_or_engagement_bait: true
     min_duration_sec: 10
     max_duration_sec: 58
+
+    # TEXTO EXATO OBRIGATORIO EM TODO POST
+    mandatory_caption_phrase: "Assista ao vivo em youtube.com/youtube"
+    exact_only_hashtag: "#launchdayonYT"
     required_hashtags:
-      - "#GTA6"
-      - "#GTAVI"
-      - "#Shorts"
-    optional_hashtags:
-      - "#RockstarGames"
-      - "#GTA6Brasil"
-    required_mentions: []
-    required_description_footer: ""
+      - "#launchdayonYT"
+    mandatory_pinned_first_comment: "Assista em https://www.youtube.com/watch?v=KY4DWumZffg"
 
-  # Acervo permitido da campanha (adicione os links de lives/videos oficiais do acervo da campanha no Real Oficial)
-  eligible_acervo_urls:
-    - url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
-      creator: "@RockstarGames"
-      title: "Grand Theft Auto VI Trailer 1"
-      official: true
-    - url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
-      creator: "@RockstarGames"
-      title: "Grand Theft Auto VI Trailer 2"
-      official: true
-
-  scaling_5_days:
-    youtube_shorts_per_day: 4
-    preferred_times_brt: ["10:00", "14:00", "18:00", "21:30"]
-    use_real_oficial_launcher_if_connected: true
-    auto_queue_championship_submission: true
+  # POS-LIVE (20/11 apos 02h00 BRT ate o fim dos 5 dias):
+  # Encerra envios da campanha e vira os 5 canais para Cortes de Lives de Streamers BR de GTA VI!
+  post_live_streamer_mode:
+    enabled_after_live_ends: true
+    language: "pt-BR"
+    streamers_ptbr_priority:
+      - name: "Skorpion"
+        handle: "@Skorpion"
+      - name: "Gamer Costa"
+        handle: "@GamerCosta"
+      - name: "Alanzoka"
+        handle: "@alanzoka"
+      - name: "Coringa"
+        handle: "@loud_coringa"
+      - name: "Paulinho o Loko"
+        handle: "@PaulinhooLoko"
+      - name: "FunkyBlackCat"
+        handle: "@FunkyBlackCat"
+      - name: "Gaules"
+        handle: "@Gaules"

@@ -1,0 +1,264 @@
+# ==============================================================================
+# MATRIZ DE 5 PÁGINAS PT-BR DE CORTES DE LIVES (GTA VI & CAMPANHA REAL OFICIAL)
+# Escala: 5 Contas x 12 Cortes/Dia = 60 Cortes/Dia por Rede (até 120 posts/dia em TikTok + Instagram Reels!)
+# Fuso Horário: America/Sao_Paulo (BRT, UTC-3)
+#
+# PLANO DE GUERRA — FASE 1 vs FASE 2:
+# 1) DURANTE A LIVE OFICIAL (19/11 01:00 BRT -> 20/11 02:00 BRT — 25 Horas):
+#    - Fonte 100% exclusiva: https://www.youtube.com/watch?v=KY4DWumZffg
+#    - Plataformas válidas que pagam (R$ 4,00 / 1k views > 5k views): TikTok + Instagram Reels
+#    - ZERO logo do canal e ZERO marca d'água na tela (`burn_credit_watermark: false`)
+#    - Legenda obrigatória: "Assista ao vivo em youtube.com/youtube" + ÚNICA hashtag `#launchdayonYT`
+#    - 1º comentário fixado obrigatório: "Assista em https://www.youtube.com/watch?v=KY4DWumZffg"
+#    - Escudos ativos: Blackout em Samira Close (07:04-08:10) e The Burnt Peanut (20:03-20:30)
+#    - Turbo máximo na Gameplay PT-BR do Skorpion (22:30-22:57) e Horário Nobre (19:00-00:00)
+#    - PROIBIDO comparações com jogos antigos da franquia ou críticas/memes negativos!
+#
+# 2) PÓS-LIVE (A partir de 20/11 02:00 BRT — Dias 3 a 5 fora de casa):
+#    - Hard stop imediato nos envios da campanha (protegendo a janela de +48h até 22/11 02:00 BRT)
+#    - As 5 páginas viram automaticamente para Cortes de Lives de Streamers PT-BR de GTA VI
+#      (@Skorpion, @GamerCosta, @alanzoka, @loud_coringa, @PaulinhooLoko, @FunkyBlackCat, @Gaules)
+#
+# BLINDAGEM ANTI-SHADOWBAN & AUDITORIA:
+# - Cada conta possui identidade editorial própria, voz neural PT-BR distinta (p/ dublagens),
+#   layout 9:16 (`blur_pad_hud` vs `smart_crop`), cor de destaque nas legendas `.ass`,
+#   preset de cor, CRF e micro-trim determinístico (`+0.4s * channel_idx`), garantindo
+#   hashes MP4, waveforms de áudio e frames 100% exclusivos.
+# - Trava atômica `channel_segment_locks` no SQLite impede que dois canais usem o mesmo
+#   trecho da live ou de qualquer vídeo no mesmo dia.
+# - Pool OAuth duplo (`youtube_quota_pool`) mantido pronto para expansão futura no Shorts
+#   pós-campanha (6 uploads no `project_a` + 6 no `project_b` = 12/dia sem HTTP 403).
+# ==============================================================================
+
+global_scaling:
+  timezone: "America/Sao_Paulo"
+  total_channels: 5
+  videos_per_channel_per_day: 12
+  total_daily_videos: 60
+  total_5day_videos: 300
+  min_spacing_minutes_per_channel: 90
+  cross_channel_stagger_minutes: 15
+  warmup_strategy: "full_12"
+  warmup_strategies_catalog:
+    full_12:
+      description: "12 cortes/conta/dia imediatos (60 cortes/dia por rede, até 120 posts/dia em TikTok + Reels)."
+      daily_cap_by_day: [12, 12, 12, 12, 12]
+    safe_ramp_6_to_12:
+      description: "Rampa gradual para contas recém-criadas (Dia 1-2: 6/dia, Dia 3: 8/dia, Dia 4: 10/dia, Dia 5+: 12/dia)."
+      daily_cap_by_day: [6, 6, 8, 10, 12]
+  anti_shadowban:
+    forbid_same_day_segment_overlap: true
+    micro_trim_offset_step_sec: 0.4
+    unique_visual_and_audio_fingerprint: true
+    campaign_slug: "gta-vi-youtube"
+    authorized_live_video_id: "KY4DWumZffg"
+    zero_logos_or_watermarks: true
+    campaign_platforms:
+      - "tiktok"
+      - "instagram_reels"
+
+channels:
+  - channel_id: "ch1_plantao_oficial"
+    channel_idx: 0
+    name: "Cortes Live Leonida"
+    handle: "@cortesliveleonida"
+    editorial_angle: "Melhores Reações Ao Vivo & Momentos Insanos da Live"
+    language: "pt-BR"
+    voice: "pt-BR-AntonioNeural"
+    tts_rate: "+2%"
+    tts_pitch: "+0Hz"
+    layout: "blur_pad_hud"
+    subtitle_accent: "cyan"
+    subtitle_accent_ass_bgr: "&H00FFFF00"
+    preferred_ai_thinker: "claude_pro"
+    color_grade_preset: "broadcast_crisp_cyan"
+    ffmpeg_crf: 19
+    pillars:
+      - "real_oficial_campaign"
+      - "gameplay_clips"
+      - "official_news"
+    stagger_minutes: 0
+    daily_slots_brt:
+      - "06:00"
+      - "07:30"
+      - "09:00"
+      - "10:30"
+      - "12:00"
+      - "13:30"
+      - "15:00"
+      - "16:30"
+      - "18:00"
+      - "19:30"
+      - "21:00"
+      - "22:30"
+    youtube_quota_pool:
+      project_a_env_prefix: "YT_CH1_PROJ_A"
+      project_b_env_prefix: "YT_CH1_PROJ_B"
+      max_uploads_per_gcp_project_per_day: 6
+      upload_cost_units: 1600
+      daily_project_quota_units: 10000
+      real_oficial_launcher_id: "ro_launcher_ch1_cortes_leonida"
+
+  - channel_id: "ch2_leonida_segredos"
+    channel_idx: 1
+    name: "Radar Streamers Vice"
+    handle: "@radarstreamersvice"
+    editorial_angle: "Descobertas Ao Vivo, Mapa & Easter Eggs dos Streamers"
+    language: "pt-BR"
+    voice: "pt-BR-FranciscaNeural"
+    tts_rate: "+0%"
+    tts_pitch: "+0Hz"
+    layout: "smart_crop"
+    subtitle_accent: "magenta"
+    subtitle_accent_ass_bgr: "&H00FF00FF"
+    preferred_ai_thinker: "codex_plus"
+    color_grade_preset: "vice_neon_magenta"
+    ffmpeg_crf: 20
+    pillars:
+      - "real_oficial_campaign"
+      - "spotlights"
+      - "gameplay_clips"
+    stagger_minutes: 15
+    daily_slots_brt:
+      - "06:15"
+      - "07:45"
+      - "09:15"
+      - "10:45"
+      - "12:15"
+      - "13:45"
+      - "15:15"
+      - "16:45"
+      - "18:15"
+      - "19:45"
+      - "21:15"
+      - "22:45"
+    youtube_quota_pool:
+      project_a_env_prefix: "YT_CH2_PROJ_A"
+      project_b_env_prefix: "YT_CH2_PROJ_B"
+      max_uploads_per_gcp_project_per_day: 6
+      upload_cost_units: 1600
+      daily_project_quota_units: 10000
+      real_oficial_launcher_id: "ro_launcher_ch2_radar_vice"
+
+  - channel_id: "ch3_gta6_dicas_pro"
+    channel_idx: 2
+    name: "Plays & Clutches GTA 6"
+    handle: "@playsgta6live"
+    editorial_angle: "Jogadas de Alto Nível, Fugas & Gameplay do Skorpion/Streamers"
+    language: "pt-BR"
+    voice: "pt-BR-ThalitaNeural"
+    tts_rate: "+3%"
+    tts_pitch: "+0Hz"
+    layout: "blur_pad_hud"
+    subtitle_accent: "yellow"
+    subtitle_accent_ass_bgr: "&H0000FFFF"
+    preferred_ai_thinker: "antigravity_ultra"
+    color_grade_preset: "tactical_hud_gold"
+    ffmpeg_crf: 21
+    pillars:
+      - "real_oficial_campaign"
+      - "gameplay_clips"
+      - "tips_tutorials"
+    stagger_minutes: 30
+    daily_slots_brt:
+      - "06:30"
+      - "08:00"
+      - "09:30"
+      - "11:00"
+      - "12:30"
+      - "14:00"
+      - "15:30"
+      - "17:00"
+      - "18:30"
+      - "20:00"
+      - "21:30"
+      - "23:00"
+    youtube_quota_pool:
+      project_a_env_prefix: "YT_CH3_PROJ_A"
+      project_b_env_prefix: "YT_CH3_PROJ_B"
+      max_uploads_per_gcp_project_per_day: 6
+      upload_cost_units: 1600
+      daily_project_quota_units: 10000
+      real_oficial_launcher_id: "ro_launcher_ch3_plays_gta6"
+
+  - channel_id: "ch4_vice_motores"
+    channel_idx: 3
+    name: "Fugas & Motores Live"
+    handle: "@fugasmotoreslive"
+    editorial_angle: "Perseguições Ao Vivo, Carros & Caos em Vice City"
+    language: "pt-BR"
+    voice: "pt-BR-AntonioNeural"
+    tts_rate: "+5%"
+    tts_pitch: "-2Hz"
+    layout: "smart_crop"
+    subtitle_accent: "orange"
+    subtitle_accent_ass_bgr: "&H000088FF"
+    preferred_ai_thinker: "claude_pro"
+    color_grade_preset: "sunset_asphalt_warm"
+    ffmpeg_crf: 19
+    pillars:
+      - "real_oficial_campaign"
+      - "gameplay_clips"
+      - "spotlights"
+    stagger_minutes: 45
+    daily_slots_brt:
+      - "06:45"
+      - "08:15"
+      - "09:45"
+      - "11:15"
+      - "12:45"
+      - "14:15"
+      - "15:45"
+      - "17:15"
+      - "18:45"
+      - "20:15"
+      - "21:45"
+      - "23:15"
+    youtube_quota_pool:
+      project_a_env_prefix: "YT_CH4_PROJ_A"
+      project_b_env_prefix: "YT_CH4_PROJ_B"
+      max_uploads_per_gcp_project_per_day: 6
+      upload_cost_units: 1600
+      daily_project_quota_units: 10000
+      real_oficial_launcher_id: "ro_launcher_ch4_fugas_motores"
+
+  - channel_id: "ch5_vice_stories"
+    channel_idx: 4
+    name: "Cortes Resenha Vice"
+    handle: "@cortesresenhavice"
+    editorial_angle: "Momentos Engraçados Positivos, Hype & Dublagens PT-BR da Live Mundial"
+    language: "pt-BR"
+    voice: "pt-BR-FranciscaNeural"
+    tts_rate: "-3%"
+    tts_pitch: "+2Hz"
+    layout: "blur_pad_hud"
+    subtitle_accent: "green"
+    subtitle_accent_ass_bgr: "&H0055FF55"
+    preferred_ai_thinker: "codex_plus"
+    color_grade_preset: "everglades_cinema_green"
+    ffmpeg_crf: 20
+    pillars:
+      - "real_oficial_campaign"
+      - "spotlights"
+      - "questions"
+    stagger_minutes: 60
+    daily_slots_brt:
+      - "07:00"
+      - "08:30"
+      - "10:00"
+      - "11:30"
+      - "13:00"
+      - "14:30"
+      - "16:00"
+      - "17:30"
+      - "19:00"
+      - "20:30"
+      - "22:00"
+      - "23:30"
+    youtube_quota_pool:
+      project_a_env_prefix: "YT_CH5_PROJ_A"
+      project_b_env_prefix: "YT_CH5_PROJ_B"
+      max_uploads_per_gcp_project_per_day: 6
+      upload_cost_units: 1600
+      daily_project_quota_units: 10000
+      real_oficial_launcher_id: "ro_launcher_ch5_resenha_vice"

@@ -161,16 +161,22 @@ class ClipperEditorAgent:
             )
             cues = cues_from_script(fallback_script, total_duration_sec=clip_duration)
 
-        # 2. Build broadcast .ass overlay (HookBanner + CaptionCenter + CreditTag)
-        video_cfg = self.config.settings.get("video_pipeline", {}) or {}
+        # 2. Build broadcast .ass overlay (HookBanner + CaptionCenter + optional CreditTag)
+        video_cfg = (self.config.settings or {}).get("video_pipeline", {}) or {}
         burn_captions = bool(video_cfg.get("burn_captions", True))
         burn_hook = bool(video_cfg.get("burn_hook_banner", True))
-        hook_duration_sec = float(video_cfg.get("hook_duration_sec", 2.5))
+        burn_credit_watermark = video_cfg.get("burn_credit_watermark")
+        default_hook_dur = 2.0 if plan.for_real_oficial_campaign else 2.5
+        hook_duration_sec = float(video_cfg.get("hook_duration_sec", default_hook_dur))
         layout_mode = str(video_cfg.get("layout_mode", "blur_pad_hud"))
         crf = int(video_cfg.get("crf", 20))
         loudnorm_lufs = float(video_cfg.get("loudnorm_lufs", -14.0))
 
-        credit_text = _format_creator_credit(plan.source.creator_handle)
+        # Rule #10: ZERO watermark or logo burned on video frame for Real Oficial campaign
+        if plan.for_real_oficial_campaign or burn_credit_watermark is False:
+            credit_text = ""
+        else:
+            credit_text = _format_creator_credit(plan.source.creator_handle)
         hook_text = plan.hook_on_screen if burn_hook else ""
         ass_cues = cues if burn_captions else []
 

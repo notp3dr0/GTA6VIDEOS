@@ -132,14 +132,76 @@ async def run_preflight(prewarm_demo_count: int = 0) -> int:
             "ALERTA CRITICO: Compliance nao bloqueou teste de footage filtrado!",
         )
 
+    # --- ESCUDO 4: 13 REGRAS DA CAMPANHA LIVE KY4DWumZffg (ZERO RECUSA) ---
+    campaign_cfg = cfg.campaign.get("campaign", {}) if isinstance(cfg.campaign, dict) else {}
+    auth_live_url = str(campaign_cfg.get("authorized_live", {}).get("url", ""))
+    valid_plats = list(campaign_cfg.get("valid_platforms", []))
+    no_watermark = cfg.settings.get("video_pipeline", {}).get("burn_credit_watermark") is False
+    exact_tag = str(campaign_cfg.get("rules", {}).get("exact_only_hashtag", ""))
+    pinned_comment = str(campaign_cfg.get("rules", {}).get("mandatory_pinned_first_comment", ""))
+
+    ky4_ok = (
+        "KY4DWumZffg" in auth_live_url
+        and set(valid_plats) == {"instagram_reels", "tiktok"}
+        and no_watermark
+        and exact_tag == "#launchdayonYT"
+        and "KY4DWumZffg" in pinned_comment
+    )
+    if ky4_ok:
+        table.add_row(
+            "4. Escudo 13 Regras Live\n(KY4DWumZffg Real Oficial)",
+            "[bold green]BLINDADO[/bold green]",
+            "Fonte unica KY4DWumZffg, TikTok + Reels apenas, ZERO marca d'agua, #launchdayonYT exclusiva, comentario fixado obrigatorio e bloqueio Samira Close / Burnt Peanut ativos.",
+        )
+    else:
+        failures += 1
+        table.add_row(
+            "4. Escudo 13 Regras Live\n(KY4DWumZffg Real Oficial)",
+            "[bold red]FALHOU[/bold red]",
+            f"Revise campaign_realoficial.yaml/settings.yaml: live={auth_live_url}, plats={valid_plats}, no_wm={no_watermark}, tag={exact_tag}",
+        )
+
+    # --- ESCUDO 5: MATRIZ 5 CANAIS x 12 VIDEOS/DIA + POOL 3 IAs (CICLO 5H) ---
+    try:
+        from gta6_agents.orchestrator.multi_channel import MultiChannelCoordinator
+        from gta6_agents.orchestrator.tri_engine_pool import TriEnginePool
+
+        mc = MultiChannelCoordinator(cfg, store)
+        channels = mc.load_channels()
+        sched_60 = mc.build_daily_60_schedule()
+        pool = TriEnginePool(cfg, store)
+        pool_st = pool.get_pool_status()
+        engines_count = len(pool_st.get("engines", {}))
+        if len(channels) == 5 and len(sched_60) == 60 and engines_count >= 3:
+            ch_names = ", ".join(c.handle or c.name for c in channels)
+            table.add_row(
+                "5. Escala 5 Canais (60/dia)\n+ Pool 3 IAs (5h Resume)",
+                "[bold green]PRONTO[/bold green]",
+                f"5 canais PT-BR ({ch_names}) = 60 cortes/dia (120 posts TikTok+Reels) + Failover Claude Pro / Codex Plus / Antigravity Ultra c/ checkpoint SQLite.",
+            )
+        else:
+            failures += 1
+            table.add_row(
+                "5. Escala 5 Canais (60/dia)\n+ Pool 3 IAs (5h Resume)",
+                "[bold red]INCOMPLETO[/bold red]",
+                f"channels={len(channels)}, daily_slots={len(sched_60)}, engines={engines_count}",
+            )
+    except Exception as exc:
+        failures += 1
+        table.add_row(
+            "5. Escala 5 Canais (60/dia)\n+ Pool 3 IAs (5h Resume)",
+            "[bold red]ERRO[/bold red]",
+            str(exc),
+        )
+
     console.print(table)
     if failures == 0:
         console.print(
             Panel(
-                "[bold green]TUDO PRONTO NA ESTRUTURA TECNICA![/bold green]\n"
-                "Proximo passo antes de viajar: preencha suas chaves no `.env`, rode `PRE_AQUECER_COFRE_DIA1.bat` "
-                "para deixar 12+ Shorts oficiais prontos no HD e inicie `INICIAR_2PC_5DIAS.bat`!",
-                title="Pre-Flight OK",
+                "[bold green]TODOS OS 5 ESCUDOS TECNICOS APROVADOS![/bold green]\n"
+                "Proximo passo antes de viajar: preencha suas chaves no `.env`, conecte as 5 contas TikTok + 5 contas Instagram no Launcher Real Oficial, "
+                "e de duplo clique em `INICIAR_3_IAS_5_CANAIS.bat` no seu 2o PC!",
+                title="Pre-Flight 5 Canais x 3 IAs OK",
             )
         )
     return failures

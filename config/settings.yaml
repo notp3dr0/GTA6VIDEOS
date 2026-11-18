@@ -1,59 +1,42 @@
 page:
-  name: "GTA 6 Fast Clips"
-  handle: "gta6fastclips"
-  bio: "GTA 6 news, tips & best clips, fast. Fan page, not affiliated with Rockstar Games."
-  niche_angle: "tips, hidden details and fast official news"
-  primary_language: "pt-BR"     # pt-BR (foco Real Oficial Brasil) | en-US | bilingual
-  secondary_language: "en-US"
+  name: "Radar Leonida Cortes"
+  handle: "radarleonidacortes"
+  bio: "Os melhores cortes de lives de GTA VI em tempo real. Página de fãs, sem afiliação oficial."
+  niche_angle: "cortes em tempo real de lives de streamers jogando GTA VI"
+  primary_language: "pt-BR"
+  secondary_language: "pt-BR"
   timezone: "America/Sao_Paulo"
-  awake_hours_start: 9
+  awake_hours_start: 8
   awake_hours_end: 23
-  gta6_launch_date: "2026-11-19" # Ajuste para modo pre-launch (countdown) ou post-launch (Day X in Leonida)
+  gta6_launch_date: "2026-11-19"
+  content_focus: "streamer_live_clips_only"
 
 platforms:
-  youtube_shorts:
-    enabled: true
-    daily_posts: 3
-    slots: ["11:30", "16:30", "20:30"]
-    aspect_ratio: "9:16"
-    resolution: "1080x1920"
-    max_duration_sec: 58
-    default_clip_duration_sec: 28
   instagram_reels:
     enabled: true
-    daily_posts: 2
-    slots: ["12:00", "19:30"]
+    daily_posts: 12
     aspect_ratio: "9:16"
     resolution: "1080x1920"
     max_duration_sec: 90
-    max_hashtags: 5
+    max_hashtags: 1
   tiktok:
     enabled: true
-    daily_posts: 3
-    slots: ["11:45", "17:00", "21:00"]
+    daily_posts: 12
     aspect_ratio: "9:16"
     resolution: "1080x1920"
     max_duration_sec: 60
+  youtube_shorts:
+    enabled: false   # Desativado durante a campanha (campanha paga apenas TikTok + Instagram!)
+    daily_posts: 0
+    aspect_ratio: "9:16"
+    resolution: "1080x1920"
+    max_duration_sec: 58
   x:
-    enabled: true
-    daily_posts: 6
-    slots:
-      - time: "08:30"
-        pillar: "official_news"
-      - time: "10:30"
-        pillar: "tips_tutorials"
-      - time: "13:00"
-        pillar: "gameplay_clips"
-      - time: "15:30"
-        pillar: "gta5_nostalgia"
-      - time: "18:30"
-        pillar: "spotlights"
-      - time: "21:30"
-        pillar: "countdown_recap"
+    enabled: false
+    daily_posts: 0
   threads:
     enabled: false
-    daily_posts: 2
-    slots: ["12:30", "20:00"]
+    daily_posts: 0
 
 video_pipeline:
   target_width: 1080
@@ -62,17 +45,18 @@ video_pipeline:
   video_codec: "libx264"
   audio_codec: "aac"
   crf: 20
-  min_clip_sec: 8
-  max_clip_sec: 32
-  layout_mode: "blur_pad_hud"   # blur_pad_hud (preserva HUD 16:9 c/ fundo blur) | smart_crop (corte 9:16 cheio)
+  min_clip_sec: 10
+  max_clip_sec: 45
+  layout_mode: "blur_pad_hud"
   burn_captions: true
   burn_hook_banner: true
-  hook_duration_sec: 2.5
+  burn_credit_watermark: false  # REGRA #10 DA CAMPANHA: PROIBIDO logo ou marca d'agua na tela!
+  hook_duration_sec: 2.0        # "Prenda nos 2 primeiros segundos e legende as falas"
   loudnorm_lufs: -14.0
 
 approval_rules:
   require_approval_for_rumors: true
-  require_approval_outside_pillars: true
+  require_approval_outside_pillars: false
   require_approval_credit_spend: true
-  min_interval_minutes_same_platform: 150
+  min_interval_minutes_same_platform: 75
   auto_publish_verified_clips: true
