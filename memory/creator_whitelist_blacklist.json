@@ -1,0 +1,104 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-11-18T00:00:00Z",
+  "policy": {
+    "default_unknown_creator": "allow_with_credit_and_transformation",
+    "require_credit_tag": true,
+    "credit_format": "🎥 @{handle}",
+    "never_repost_leaks_or_datamines": true,
+    "never_crop_out_hud_deceptively": true,
+    "respect_no_repost_bios": true
+  },
+  "whitelist": [
+    {
+      "handle": "@RockstarGames",
+      "name": "Rockstar Games",
+      "youtube_channel_id": "UC6VcWc1rAoWdBCM0JxrRQ3A",
+      "platforms": ["youtube", "x", "official_newswire"],
+      "is_official": true,
+      "permission_basis": "official_press_and_campaign_acervo",
+      "notes": "Official Rockstar Games trailers, Leonida regional spotlights, and Newswire announcements."
+    },
+    {
+      "handle": "@GTASeriesVideos",
+      "name": "GTA Series Videos",
+      "youtube_channel_id": "UCuWcjpKbIDAbZfHoru1toFg",
+      "platforms": ["youtube", "x"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "High-accuracy GTA guides, trailer breakdowns, hidden details, and franchise comparisons."
+    },
+    {
+      "handle": "@TGGonYT",
+      "name": "TGG",
+      "youtube_channel_id": "UCD23kK2Q4P3H9G5xN4vL2wA",
+      "platforms": ["youtube", "x"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "Verified GTA news recaps, GTA Online preparation guides, and gameplay commentary."
+    },
+    {
+      "handle": "@DarkViperAU",
+      "name": "DarkViperAU",
+      "youtube_channel_id": "UCV6mNrW8CrmWtcxWfQXy11g",
+      "platforms": ["youtube", "x"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "GTA V mechanics, speedrun facts, AI behavior trivia, and physics details."
+    },
+    {
+      "handle": "@Broughy1322",
+      "name": "Broughy1322",
+      "youtube_channel_id": "UCcZ3sRk9z6jjgfYQbMGTpig",
+      "platforms": ["youtube"],
+      "is_official": false,
+      "permission_basis": "public_credited_transformed",
+      "notes": "GTA vehicle class testing, braking/handling physics, and lap-time benchmarks."
+    }
+  ],
+  "blacklist": [
+    {
+      "handle": "@GTA6LeaksHub",
+      "reason": "Distributes stolen pre-release dev-build footage subject to DMCA strikes.",
+      "added_at": "2026-11-01"
+    },
+    {
+      "handle": "@ViceCityDataminer",
+      "reason": "Publishes datamined audio/map/tracklist files and unverified code dumps.",
+      "added_at": "2026-11-01"
+    },
+    {
+      "handle": "@FakeRockstarInsider",
+      "reason": "Serial fake confirmations, clickbait hoaxes, and Rockstar impersonation.",
+      "added_at": "2026-11-01"
+    },
+    {
+      "handle": "@NoRepostVault",
+      "reason": "Creator explicitly states 'No reposts or clips allowed' in channel bio.",
+      "added_at": "2026-11-01"
+    }
+  ],
+  "blocked_keywords": [
+    "leaked build",
+    "dev build",
+    "source code leak",
+    "datamined",
+    "datamine",
+    "leaked full map",
+    "leaked tracklist",
+    "mapa vazado",
+    "vazamento gta 6",
+    "build vazada",
+    "pirated copy",
+    "cópia pirata",
+    "torrent download",
+    "crack download",
+    "money glitch exploit",
+    "godmode exploit",
+    "aimbot",
+    "wallhack",
+    "nude mod",
+    "nsfw mod",
+    "extreme gore"
+  ]
+}

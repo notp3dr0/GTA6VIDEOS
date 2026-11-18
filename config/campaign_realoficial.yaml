@@ -1,0 +1,42 @@
+campaign:
+  platform: "Real Oficial (Real Rewards)"
+  slug: "gta-vi-youtube"
+  campaign_url: "https://app.realoficial.com.br/c/gta-vi-youtube?ro_vid=a56ec50b-725e-4c73-a353-4e3b2e80678b&fbp=fb.2.1795018619635.489703140607791075"
+  referral_vid: "a56ec50b-725e-4c73-a353-4e3b2e80678b"
+  target_network: "youtube_shorts"
+  language: "pt-BR"
+
+  # Regras e requisitos da campanha (atualize com o regulamento exato exibido no painel da campanha!)
+  rules:
+    must_be_public: true
+    no_third_party_watermarks: true
+    clean_normalized_audio: true
+    burned_in_legible_captions: true
+    min_duration_sec: 10
+    max_duration_sec: 58
+    required_hashtags:
+      - "#GTA6"
+      - "#GTAVI"
+      - "#Shorts"
+    optional_hashtags:
+      - "#RockstarGames"
+      - "#GTA6Brasil"
+    required_mentions: []
+    required_description_footer: ""
+
+  # Acervo permitido da campanha (adicione os links de lives/videos oficiais do acervo da campanha no Real Oficial)
+  eligible_acervo_urls:
+    - url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+      creator: "@RockstarGames"
+      title: "Grand Theft Auto VI Trailer 1"
+      official: true
+    - url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
+      creator: "@RockstarGames"
+      title: "Grand Theft Auto VI Trailer 2"
+      official: true
+
+  scaling_5_days:
+    youtube_shorts_per_day: 4
+    preferred_times_brt: ["10:00", "14:00", "18:00", "21:30"]
+    use_real_oficial_launcher_if_connected: true
+    auto_queue_championship_submission: true

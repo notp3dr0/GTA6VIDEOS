@@ -1,0 +1,34 @@
+name: Cloud Failover Cron
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-once:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Set up Python with uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra youtube
+
+      - name: Run once
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          HYDROGEN_PROVIDER: ${{ secrets.HYDROGEN_PROVIDER }}
+          HYDROGEN_MODEL: ${{ secrets.HYDROGEN_MODEL }}
+          CARBON_PROVIDER: ${{ secrets.CARBON_PROVIDER }}
+          CARBON_MODEL: ${{ secrets.CARBON_MODEL }}
+        run: uv run gta6-agents run-once

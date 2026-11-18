@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  gta6-swarm:
+    build: .
+    restart: always
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./memory:/app/memory
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./config:/app/config

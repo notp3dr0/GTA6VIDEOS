@@ -1,0 +1,125 @@
+# ==============================================================================
+# BANCO OFICIAL DE CLIPES PRONTO PARA O DIA 1 (100% MATERIAL OFICIAL ROCKSTAR)
+# Protecao contra o Erro Fatal #1 (ficar sem estoque no Dia 1) e #3 (zero leaks)
+# ==============================================================================
+vault_cuts:
+  - id: "t1_lucia_intro"
+    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+    creator: "@RockstarGames"
+    title: "Lucia Caminos Opening Frame & Leonida Sun"
+    pillar: "spotlights"
+    start_sec: 5
+    end_sec: 29
+    verified_facts:
+      - "Lucia Caminos é uma das protagonistas confirmadas no Trailer 1 oficial da Rockstar Games."
+      - "A iluminação volumétrica do sistema prisional de Leonida abre o primeiro trailer oficial."
+  - id: "t1_vice_beach_crowds"
+    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+    creator: "@RockstarGames"
+    title: "Vice Beach NPC Crowd Density & Animations"
+    pillar: "gameplay_clips"
+    start_sec: 19
+    end_sec: 42
+    verified_facts:
+      - "Vice Beach exibe dezenas de NPCs simultâneos com animações independentes, cães e jet-skis ao fundo."
+      - "A física da água e reflexos costeiros foram revelados oficialmente no Trailer 1."
+  - id: "t1_grassrivers_wildlife"
+    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+    creator: "@RockstarGames"
+    title: "Grassrivers Airboat, Flamingos & Alligators"
+    pillar: "spotlights"
+    start_sec: 27
+    end_sec: 49
+    verified_facts:
+      - "A região pantanosa de Grassrivers traz aerobarcos, bandos de flamingos e jacarés detalhados."
+      - "Ecossistema inspirado nos Everglades da Flórida confirmado oficialmente para o estado de Leonida."
+  - id: "t1_ocean_drive_night"
+    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+    creator: "@RockstarGames"
+    title: "Vice City Ocean Drive Classic Cars & Neon"
+    pillar: "gta5_nostalgia"
+    start_sec: 38
+    end_sec: 61
+    verified_facts:
+      - "Os hotéis Art Déco iluminados por neon retornam em escala moderna em Vice City."
+      - "Carros clássicos conversíveis e muscle cars desfilam à noite com reflexos em tempo real na lataria."
+  - id: "t1_mud_club_trucks"
+    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+    creator: "@RockstarGames"
+    title: "Thrillbilly Mud Club Monster Trucks Physics"
+    pillar: "gameplay_clips"
+    start_sec: 50
+    end_sec: 72
+    verified_facts:
+      - "O Thrillbilly Mud Club mostra deformação de lama e caminhonetes gigantes suspensas no interior de Leonida."
+      - "Diversidade cultural entre o glamour de Vice City e o interior rural de Leonida."
+  - id: "t1_social_media_parody"
+    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+    creator: "@RockstarGames"
+    title: "In-Game Vertical Social Feed & Viral Leonida Moments"
+    pillar: "official_news"
+    start_sec: 56
+    end_sec: 80
+    verified_facts:
+      - "O Trailer 1 apresentou clipes verticais gravados pelos próprios moradores de Leonida dentro do universo do jogo."
+      - "Sátira moderna da cultura de vídeos curtos e eventos caóticos nas ruas de Leonida."
+  - id: "t1_highway_getaway"
+    url: "https://www.youtube.com/watch?v=QdBZY2fkU-0"
+    creator: "@RockstarGames"
+    title: "Lucia & Jason High-Speed Getaway & Trust Pact"
+    pillar: "countdown_recap"
+    start_sec: 68
+    end_sec: 90
+    verified_facts:
+      - "A dupla Lucia e Jason protagoniza fugas coordenadas em alta velocidade pelas rodovias de Leonida."
+      - "O pacto 'Trust' encerra o Trailer 1 oficial da Rockstar Games."
+  - id: "t2_jason_keys_morning"
+    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
+    creator: "@RockstarGames"
+    title: "Jason Duval & Leonida Keys Coastal Atmosphere"
+    pillar: "spotlights"
+    start_sec: 4
+    end_sec: 28
+    verified_facts:
+      - "O Trailer 2 oficial aprofunda a rotina de Jason Duval nas ilhas costeiras de Leonida Keys."
+      - "Pontes tropicais, barcos e iluminação costeira realista capturados diretamente no hardware de console."
+  - id: "t2_vehicle_interiors"
+    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
+    creator: "@RockstarGames"
+    title: "GTA 6 Car Interiors, Mirrors & Suspension Details"
+    pillar: "tips_tutorials"
+    start_sec: 28
+    end_sec: 52
+    verified_facts:
+      - "Retrovisores funcionais, painéis internos detalhados e transferência de peso da suspensão visíveis no Trailer 2."
+      - "Física de fumaça de pneu e iluminação interna realista nos veículos de Leonida."
+  - id: "t2_port_gellhorn_action"
+    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
+    creator: "@RockstarGames"
+    title: "Port Gellhorn Chase & Police Tactical Response"
+    pillar: "gameplay_clips"
+    start_sec: 52
+    end_sec: 77
+    verified_facts:
+      - "Port Gellhorn traz áreas portuárias, motéis e perseguições intensas com viaturas estaduais de Leonida."
+      - "Comportamento tático da polícia e destruição ambiental exibidos no material oficial."
+  - id: "t2_mount_kalaga_wilderness"
+    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
+    creator: "@RockstarGames"
+    title: "Mount Kalaga National Park & Off-Road Trails"
+    pillar: "spotlights"
+    start_sec: 78
+    end_sec: 102
+    verified_facts:
+      - "O Parque Nacional Mount Kalaga fica na fronteira norte de Leonida com florestas densas, rios e trilhas off-road."
+      - "Caiaques, vida selvagem e neblina matinal confirmados oficialmente pela Rockstar Games."
+  - id: "t2_vice_city_skyline_finale"
+    url: "https://www.youtube.com/watch?v=VQRLujxTm3c"
+    creator: "@RockstarGames"
+    title: "Vice City Full Skyline & Launch Scale Comparison"
+    pillar: "gta5_nostalgia"
+    start_sec: 103
+    end_sec: 129
+    verified_facts:
+      - "Depois de mais de uma década em Los Santos, a escala vertical e marítima de Vice City redefine o mapa da franquia."
+      - "Material 100% oficial da Rockstar Games pronto para o lançamento."
