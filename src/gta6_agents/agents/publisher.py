@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from gta6_agents.config import AppConfig
 from gta6_agents.integrations.buffer_webhook import BufferWebhookPublisher
 from gta6_agents.integrations.meta_tiktok import MetaTikTokPublisher
+from gta6_agents.integrations.post_for_me import PostForMePublisher
 from gta6_agents.integrations.x_twitter import XTwitterPublisher
 from gta6_agents.integrations.youtube_shorts import YouTubeShortsPublisher
 from gta6_agents.models import (
@@ -34,6 +35,7 @@ class PublisherAgent:
         self.store = store
         self.youtube = YouTubeShortsPublisher(config)
         self.x_twitter = XTwitterPublisher(config)
+        self.post_for_me = PostForMePublisher(config)
         self.meta_tiktok = MetaTikTokPublisher(config)
         self.buffer_webhook = BufferWebhookPublisher(config)
 
@@ -131,6 +133,10 @@ class PublisherAgent:
             return await self.x_twitter.publish(plan, clip, copy)
 
         if platform == Platform.INSTAGRAM_REELS:
+            if self.post_for_me.has_credentials:
+                return await self.post_for_me.publish(
+                    plan, clip, copy, target_platform=Platform.INSTAGRAM_REELS
+                )
             if self.meta_tiktok.has_instagram_credentials:
                 return await self.meta_tiktok.publish_instagram_reel(plan, clip, copy)
             if self.buffer_webhook.has_webhook or self.buffer_webhook.has_buffer_credentials:
@@ -140,6 +146,10 @@ class PublisherAgent:
             return await self.meta_tiktok.publish_instagram_reel(plan, clip, copy)
 
         if platform == Platform.TIKTOK:
+            if self.post_for_me.has_credentials:
+                return await self.post_for_me.publish(
+                    plan, clip, copy, target_platform=Platform.TIKTOK
+                )
             if self.meta_tiktok.has_tiktok_credentials:
                 return await self.meta_tiktok.publish_tiktok(plan, clip, copy)
             if self.buffer_webhook.has_webhook or self.buffer_webhook.has_buffer_credentials:

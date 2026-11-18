@@ -58,6 +58,9 @@ class AppConfig(BaseModel):
     buffer_profile_ids: list[str] = Field(default_factory=list)
     webhook_publisher_url: str = ""
 
+    post_for_me_api_key: str = ""
+    post_for_me_base_url: str = "https://api.postforme.dev/v1"
+
     instagram_access_token: str = ""
     instagram_ig_user_id: str = ""
     tiktok_access_token: str = ""
@@ -167,6 +170,10 @@ def load_config(root_dir: Path | None = None) -> AppConfig:
         buffer_access_token=os.getenv("BUFFER_ACCESS_TOKEN", ""),
         buffer_profile_ids=profile_ids,
         webhook_publisher_url=os.getenv("WEBHOOK_PUBLISHER_URL", ""),
+        post_for_me_api_key=(
+            os.getenv("POST_FOR_ME_API_KEY", "") or os.getenv("POSTFORME_API_KEY", "")
+        ),
+        post_for_me_base_url=os.getenv("POST_FOR_ME_BASE_URL", "https://api.postforme.dev/v1"),
         instagram_access_token=os.getenv("INSTAGRAM_ACCESS_TOKEN", ""),
         instagram_ig_user_id=os.getenv("INSTAGRAM_IG_USER_ID", ""),
         tiktok_access_token=os.getenv("TIKTOK_ACCESS_TOKEN", ""),

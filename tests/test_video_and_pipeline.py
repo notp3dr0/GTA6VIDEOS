@@ -716,5 +716,133 @@ async def test_multi_live_simultaneous_hype_monitor_routes_to_distinct_channels_
     assert set(orchestrator.hype_monitor._buffers.keys()) == {"SkorpionOFICIAL", "alanzoka"}
 
 
+@pytest.mark.asyncio
+async def test_post_for_me_publisher_auto_matches_channel_handle_and_publishes_reel_and_tiktok(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify PostForMePublisher auto-discovers @handle accounts, uploads binary MP4, sets placement='reels', and returns live URL."""
+    import httpx
+    from gta6_agents.agents.publisher import PublisherAgent
+    from gta6_agents.models import CaptionBundle, PlatformCopy, RenderedClip
+
+    cfg = _make_pipeline_test_config(tmp_path).model_copy(
+        update={
+            "dry_run": False,
+            "post_for_me_api_key": "pfm_live_test_key_123",
+        }
+    )
+    store = StateStore(cfg.data_dir, cfg.memory_dir)
+    publisher = PublisherAgent(cfg, store)
+
+    mp4_file = tmp_path / "cut_ch5.mp4"
+    mp4_file.write_bytes(b"\x00\x00\x00\x18ftypmp42fakevideobinary")
+
+    captured_posts: list[dict] = []
+
+    def _mock_pfm_handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "/social-accounts" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"id": "spc_ig_ch1", "platform": "instagram", "username": "cortesliveleonida", "status": "connected"},
+                        {"id": "spc_ig_ch5", "platform": "instagram", "username": "cortesresenhavice", "status": "connected"},
+                        {"id": "spc_tt_ch5", "platform": "tiktok", "username": "@cortesresenhavice", "status": "connected"},
+                    ]
+                },
+            )
+        if "/media/create-upload-url" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "upload_url": "https://upload.postforme.dev/signed-put/123",
+                    "media_url": "https://cdn.postforme.dev/media/123.mp4",
+                },
+            )
+        if "upload.postforme.dev/signed-put" in url:
+            return httpx.Response(200, content=b"")
+        if url.endswith("/social-posts"):
+            body = json.loads(request.content.decode("utf-8"))
+            captured_posts.append(body)
+            post_id = "post_ig_99" if body["social_accounts"] == ["spc_ig_ch5"] else "post_tt_99"
+            return httpx.Response(200, json={"id": post_id})
+        if "/social-post-results" in url:
+            if "post_ig_99" in url:
+                return httpx.Response(
+                    200,
+                    json={"data": [{"success": True, "platform_data": {"url": "https://www.instagram.com/reel/Cxyz99/"}}]},
+                )
+            return httpx.Response(
+                200,
+                json={"data": [{"success": True, "platform_data": {"url": "https://www.tiktok.com/@cortesresenhavice/video/74499"}}]},
+            )
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(_mock_pfm_handler)
+    orig_async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda *args, **kwargs: orig_async_client(transport=transport, timeout=10.0),
+    )
+    # Speed up poll sleep in unit test
+    import asyncio as _aio
+    monkeypatch.setattr(_aio, "sleep", lambda _s: _aio.sleep(0) if False else _noop_coro())
+
+    async def _noop_coro() -> None:
+        return None
+
+    source = SourceCandidate(
+        title="Crise de riso do Alanzoka em Leonida!",
+        url="https://www.twitch.tv/alanzoka#hype-1",
+        creator_handle="@alanzoka",
+        source_type="twitch",
+        metadata={"target_channel_id": "ch5_vice_stories"},
+    )
+    plan = ClipPlan(
+        source=source,
+        pillar=ContentPillar.GAMEPLAY_CLIPS,
+        language="pt-BR",
+        hook_on_screen="NINGUÉM TANCOU ESSA CENA!",
+        start_sec=0.0,
+        end_sec=20.0,
+        target_platforms=[Platform.INSTAGRAM_REELS, Platform.TIKTOK],
+        for_real_oficial_campaign=False,
+    )
+    clip = RenderedClip(plan_id=plan.id, video_path=str(mp4_file), duration_sec=20.0)
+    bundle = CaptionBundle(
+        plan_id=plan.id,
+        copies={
+            Platform.INSTAGRAM_REELS: PlatformCopy(
+                platform=Platform.INSTAGRAM_REELS,
+                caption="Alanzoka chorou de rir!",
+                hashtags=["#GTA6"],
+                credit_line="🎥 Crédito: @alanzoka",
+            ),
+            Platform.TIKTOK: PlatformCopy(
+                platform=Platform.TIKTOK,
+                caption="Alanzoka chorou de rir!",
+                hashtags=["#GTA6"],
+                credit_line="🎥 Crédito: @alanzoka",
+            ),
+        },
+    )
+
+    pubs = await publisher.publish_all(plan, clip, bundle)
+    assert len(pubs) == 2
+    assert pubs[0].status == "published"
+    assert pubs[0].public_url == "https://www.instagram.com/reel/Cxyz99/"
+    assert pubs[1].status == "published"
+    assert pubs[1].public_url == "https://www.tiktok.com/@cortesresenhavice/video/74499"
+
+    # Confirm ch5 (@cortesresenhavice) was auto-matched on both networks + placement='reels'
+    assert captured_posts[0]["social_accounts"] == ["spc_ig_ch5"]
+    assert captured_posts[0]["platform_configurations"]["instagram"]["placement"] == "reels"
+    assert captured_posts[1]["social_accounts"] == ["spc_tt_ch5"]
+
+
+
 
 
