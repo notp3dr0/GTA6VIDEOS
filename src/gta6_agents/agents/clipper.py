@@ -84,6 +84,12 @@ class ClipperEditorAgent:
         url = (plan.source.url or "").strip()
         synthetic_path = clip_work_dir / f"{plan.id}_synthetic_source.mp4"
 
+        prebuffered = str((plan.source.metadata or {}).get("prebuffered_segment_path") or "").strip()
+        if prebuffered:
+            pre_path = Path(prebuffered)
+            if pre_path.is_file() and pre_path.stat().st_size > 1024:
+                return pre_path, False
+
         if not url or url.startswith(("synthetic://", "demo://", "mock://")):
             path = await asyncio.to_thread(
                 generate_synthetic_source_video,

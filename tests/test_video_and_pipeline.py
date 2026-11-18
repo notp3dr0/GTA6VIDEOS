@@ -437,3 +437,186 @@ async def test_post_live_handoff_prioritizes_newest_br_vods_rejects_old_vods_and
     assert "br_fresh_vod_radar_30m" in job_ids
 
 
+@pytest.mark.asyncio
+async def test_live_hype_monitor_detects_scream_stitches_retroactive_replay_and_renders(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Real FFmpeg ring-buffer test: calm setup chunk -> sudden loud scream + chat 'CLIPA KKKKK' -> retroactive stitch -> 1080x1920 render."""
+    import os
+    import subprocess
+    from gta6_agents.agents import live_hype_monitor
+    from gta6_agents.agents.live_hype_monitor import RollingLiveRingBuffer
+    from gta6_agents.orchestrator.scheduler import DailyScheduler
+
+    cfg = _make_pipeline_test_config(tmp_path)
+    store = StateStore(cfg.data_dir, cfg.memory_dir)
+    orchestrator = MultiAgentOrchestrator(cfg, store)
+
+    def _ffprobe_info(path: Path) -> dict:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        raw = json.loads(proc.stdout)
+        st = (raw.get("streams") or [{}])[0]
+        fmt = raw.get("format") or {}
+        return {
+            "width": int(st.get("width", 0)),
+            "height": int(st.get("height", 0)),
+            "duration_sec": float(fmt.get("duration", 0.0)),
+        }
+
+    ring = RollingLiveRingBuffer(
+        stream_slug="alanzoka_live",
+        buffer_dir=tmp_path / "live_rings",
+        segment_sec=6,
+        wrap_count=24,
+    )
+    ring.buffer_dir.mkdir(parents=True, exist_ok=True)
+
+    chunk_0 = ring.buffer_dir / "chunk_000.ts"
+    chunk_1 = ring.buffer_dir / "chunk_001.ts"
+
+    # Chunk 0 (T - 12s to T - 6s): Calm setup BEFORE the funny/epic play (~-29 dB quiet talking)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=0x101830:s=1280x720:r=30:d=6",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=260:duration=6,volume=0.04",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            str(chunk_0),
+        ],
+        check=True,
+    )
+    os.utime(chunk_0, (1700000000.0, 1700000000.0))
+
+    # Chunk 1 (T - 6s to T): Sudden streamer scream/laugh (~-1 dB) + visual explosion color flash!
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=1280x720:r=30:d=6",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:duration=6,volume=2.8",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            str(chunk_1),
+        ],
+        check=True,
+    )
+    os.utime(chunk_1, (1700000006.0, 1700000006.0))
+
+    # 1. Calm chunk must NOT trigger a clip and must calibrate vocal baseline
+    calm_analysis, calm_cand = await orchestrator.hype_monitor.evaluate_buffered_chunk(
+        stream_key="alanzoka_live",
+        canonical_url="https://www.twitch.tv/alanzoka",
+        creator_handle="@alanzoka",
+        streamer_name="Alanzoka",
+        chunk_path=chunk_0,
+        ring_buffer=ring,
+        for_campaign=False,
+        sample_chat=False,
+    )
+    assert calm_analysis.triggered is False
+    assert calm_cand is None
+
+    # 2. Mock anonymous Twitch IRC chat burst ("CLIPA ISSO KKKKK MEU DEUS")
+    async def _fake_chat_burst(channel_login: str, sample_seconds: float = 3.0):
+        return {
+            "messages_10s": 28.0,
+            "hype_hits": 5,
+            "reactions": ["CLIPA ISSO KKKKKKK", "MEU DEUS QUE INSANO"],
+        }
+
+    monkeypatch.setattr(live_hype_monitor, "sample_twitch_chat_hype", _fake_chat_burst)
+
+    # 3. Loud scream + visual jump + chat burst MUST trigger retroactive stitch & instant candidate!
+    spike_analysis, instant_cand = await orchestrator.hype_monitor.evaluate_buffered_chunk(
+        stream_key="alanzoka_live",
+        canonical_url="https://www.youtube.com/watch?v=KY4DWumZffg",
+        creator_handle="@YouTube",
+        streamer_name="Skorpion",
+        chunk_path=chunk_1,
+        ring_buffer=ring,
+        for_campaign=True,
+        twitch_login="alanzoka",
+        sample_chat=True,
+    )
+    assert spike_analysis.triggered is True
+    assert spike_analysis.composite_spike_score >= 58.0
+    assert spike_analysis.hype_category == "engracado"
+    assert instant_cand is not None
+
+    stitched_path = Path(instant_cand.metadata["prebuffered_segment_path"])
+    assert stitched_path.exists()
+    # Retroactive stitch combined chunk_0 (6s setup BEFORE scream) + chunk_1 (6s scream) = ~12s!
+    stitched_probe = _ffprobe_info(stitched_path)
+    assert stitched_probe["duration_sec"] >= 11.0
+
+    # 4. Full pipeline render with demo_video_fallback=False proves zero re-download & 13-rule compliance!
+    res = await orchestrator._process_candidate(
+        instant_cand,
+        include_campaign=True,
+        demo_video_fallback=False,
+    )
+    assert res["status"] == "published", f"Expected published, got: {res}"
+    out_video = Path(res["video_path"])
+    assert out_video.exists()
+    final_probe = _ffprobe_info(out_video)
+    assert final_probe["width"] == 1080
+    assert final_probe["height"] == 1920
+
+    # 5. Verify DailyScheduler registers the 20-second Real-Time Live Hype Monitor job
+    sched = DailyScheduler(cfg, orchestrator=orchestrator, store=store)
+    jobs = sched.configure_jobs()
+    assert "live_hype_monitor_20s" in {j["id"] for j in jobs}
+
+
+

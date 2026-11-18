@@ -24,6 +24,8 @@ Sistema multi-agente em Python projetado para rodar **100% no piloto automático
 - **Fase 2 — Virada Automática Pós-Live (`20/11 02h00 BRT` -> Dias 3 a 5 Fora de Casa)**:
   - **Hard Stop às `01h57 BRT` de `20/11`**: trava automática de segurança 3 minutos antes do fim da live para nenhum upload cair fora do ar, protegendo a janela de **+48h de contagem de views (até `22/11 02h00 BRT`)** sem deletar, arquivar ou privar nenhum post da campanha.
   - **Pivot Automático para Streamers BR de GTA VI**: a partir de `20/11 02h00 BRT`, as 5 contas mudam sozinhas para **Cortes de Lives de Streamers PT-BR jogando GTA VI** (`@Skorpion`, `@GamerCosta`, `@alanzoka`, `@loud_coringa`, `@PaulinhooLoko`, `@FunkyBlackCat`, `@Gaules`), mantendo o crescimento orgânico 24/7 enquanto você está fora!
+- **Monitor de Hype Ao Vivo & Replay Retroativo (`live_hype_monitor.py`)**:
+  - Igual aos sistemas profissionais de corte em tempo real (como Real Oficial / OBS Replay): mantém um **Buffer Circular `.ts` de ~2,4 min (~80 MB máx em disco)** da live ativa (`KY4DWumZffg` na Fase 1 ou streamer BR ao vivo na Fase 2) e analisa a cada **20s** picos súbitos de **grito/risada em dB (`volumedetect`)**, **explosão/ação visual (`scdet`)** e **enxurrada no chat da Twitch (`"CLIPA"`, `"KKKKK"`, `"MEU DEUS"`, `"INSANO"`)** — voltando **18 segundos no tempo ANTES da reação** para costurar o contexto + o clímax, legendar com Whisper PT-BR e postar na hora!
 - **Pool Tri-IA Resiliente (`Claude Pro` + `Codex Plus` + `Antigravity Ultra`)**:
   - Divisão inteligente de esforço (`THINK_XHIGH` vs `EXECUTE_LOW`), detecção automática de limite de **5 horas**, failover instantâneo sem perder progresso via SQLite (`task_checkpoints`) e sondas de retomada a cada 15 minutos.
 

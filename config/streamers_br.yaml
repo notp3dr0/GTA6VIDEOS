@@ -28,6 +28,15 @@ capture_settings:
   vod_radar_interval_minutes: 30            # Varredura automática a cada 30 min atrás de novos VODs recém-encerrados
   auto_whisper_transcribe_ptbr: true        # Usa Groq Whisper (whisper-large-v3-turbo) ou OpenAI Whisper se houver chave no .env
   strict_gta6_only_filter: true             # Ignora lives/vídeos de GTA 5 RP, CS2, Roblox, etc.
+  live_hype_monitor:
+    enabled: true                           # Monitor de picos ao vivo estilo Real Oficial / OpusClip Live
+    poll_interval_sec: 20                   # Checa novos blocos de 6s do buffer circular a cada 20s
+    ring_segment_sec: 6                     # Fatias de 6s em disco (-segment_wrap 24 = máx ~2.4 min / ~80 MB em SSD)
+    ring_wrap_segments: 24                  # Nunca enche o HD do 2º PC nos 5 dias
+    retroactive_lookback_sec: 25            # Clipa ~18s ANTES do grito/risada + ~7s da reação!
+    spike_threshold: 58.0                   # Score mínimo [0..100] somando pico de voz/risada (dB) + ação visual + chat ("CLIPA"/"KKKK")
+    min_minutes_between_instant_clips: 8.0  # Cooldown anti-spam entre clipes instantâneos
+
 
 streamers_br:
   - handle: "@SkorpionOFICIAL"

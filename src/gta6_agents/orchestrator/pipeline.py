@@ -75,8 +75,11 @@ class MultiAgentOrchestrator:
         self.analytics = AnalyticsLearningAgent(self.config, self.store)
         self.notifier = RemoteNotifier(self.config, self.store)
 
+        from gta6_agents.agents.live_hype_monitor import LiveHypeMonitorAgent
         from gta6_agents.orchestrator.multi_channel import MultiChannelCoordinator
         from gta6_agents.orchestrator.tri_engine_pool import TriEnginePool
+
+        self.hype_monitor = LiveHypeMonitorAgent(self.config, self.store)
 
         try:
             self.multi_channel: MultiChannelCoordinator | None = MultiChannelCoordinator(

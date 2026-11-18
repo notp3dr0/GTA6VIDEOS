@@ -142,6 +142,25 @@ class DailyScheduler:
             logger.exception("Scheduled slot (%s) failed: %s", label, exc)
             await self.orchestrator.notifier.notify_error(f"Scheduled slot {label}", exc)
 
+    async def _run_live_hype_monitor(self) -> None:
+        """Every 20s, poll the active live ring buffer for audio/visual/chat hype spikes & clip retroactively."""
+        if self.config.dry_run:
+            return
+        monitor = getattr(self.orchestrator, "hype_monitor", None)
+        if monitor is None:
+            return
+        try:
+            res = await monitor.poll_active_live_once(self.orchestrator)
+            if res.get("status") == "instant_clip_triggered":
+                logger.info(
+                    "Instant Live Hype Clip triggered! category=%s score=%.1f channel=%s",
+                    res.get("category"),
+                    float(res.get("score", 0.0)),
+                    res.get("channel_id", ""),
+                )
+        except Exception as exc:
+            logger.debug("LiveHypeMonitor tick note: %s", exc)
+
     async def _run_fresh_vod_radar(self) -> None:
         """Every 30m, scan YouTube & Twitch for newly finished VODs and active lives of BR streamers."""
         if self.config.dry_run:
@@ -266,7 +285,16 @@ class DailyScheduler:
                 replace_existing=True,
             )
 
-        # 3. Continuous Fresh Brazilian VOD & Live Radar every 30 minutes (post-live & multi-day hunting)
+        # 3. Real-Time Live Hype Monitor every 20s (detects screams/laughter/chat bursts & auto-clips retroactively)
+        self.scheduler.add_job(
+            self._run_live_hype_monitor,
+            trigger=IntervalTrigger(seconds=20, timezone=self.tz),
+            id="live_hype_monitor_20s",
+            name="Real-Time Live Hype & Instant Replay Monitor (20s)",
+            replace_existing=True,
+        )
+
+        # 4. Continuous Fresh Brazilian VOD & Live Radar every 30 minutes (post-live & multi-day hunting)
         self.scheduler.add_job(
             self._run_fresh_vod_radar,
             trigger=IntervalTrigger(minutes=30, timezone=self.tz),
