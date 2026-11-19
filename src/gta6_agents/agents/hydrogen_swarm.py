@@ -407,9 +407,12 @@ def scan_transcript_for_secrets(
                     cat = c_name
                     break
 
+            import hashlib
+
             deep_link = f"{clean_base}{sep}t={int(start_sec)}s" if clean_base else ""
+            sid = hashlib.md5(sent.strip().lower().encode("utf-8")).hexdigest()[:6]
             lead = {
-                "id": f"S_{abs(hash(sent.strip().lower())) % 10000:04d}",
+                "id": f"S_{sid}",
                 "category": cat,
                 "name": sent.strip()[:60],
                 "where": sent.strip()[:200],

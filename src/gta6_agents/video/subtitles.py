@@ -214,6 +214,9 @@ def build_ass_subtitles(
     }
     caption_margin_v = margin_v_map.get(layout_mode, 480)
 
+    is_split = layout_mode in ("react", "facecam")
+    seam_pos = r"\an5\pos(540,730)" if is_split else ""
+
     header = "\n".join(
         [
             "[Script Info]",
@@ -233,20 +236,20 @@ def build_ass_subtitles(
                 "Alignment, MarginL, MarginR, MarginV, Encoding"
             ),
             (
-                "Style: HookBanner,DejaVu Sans,52,&H0000EAFF,&H00FFFFFF,"
-                "&H28000000,&H80000000,-1,0,0,0,100,100,0,0,3,14,0,8,70,70,240,1"
+                "Style: HookBanner,DejaVu Sans,50,&H0000EAFF,&H00FFFFFF,"
+                "&H18000000,&H80000000,-1,0,0,0,100,100,0,0,3,16,0,8,65,65,210,1"
             ),
             (
-                f"Style: CaptionCenter,DejaVu Sans,62,&H00FFFFFF,{accent_ass_bgr},"
-                f"&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,70,70,{caption_margin_v},1"
+                f"Style: CaptionCenter,DejaVu Sans,70,&H00FFFFFF,{accent_ass_bgr},"
+                f"&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,3,2,65,65,{caption_margin_v},1"
             ),
             (
                 "Style: CreditTag,DejaVu Sans,34,&H18FFFFFF,&H00FFFFFF,"
                 "&H40000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,1,60,60,380,1"
             ),
             (
-                "Style: TitleBox,DejaVu Sans,48,&H0000EAFF,&H00FFFFFF,"
-                "&H28000000,&H80000000,-1,0,0,0,100,100,0,0,3,10,0,8,70,70,140,1"
+                "Style: TitleBox,DejaVu Sans,46,&H00000000,&H00000000,"
+                "&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,5,65,65,140,1"
             ),
             (
                 "Style: TitleOut,DejaVu Sans,44,&H00FFFFFF,&H0000EAFF,"
@@ -269,25 +272,27 @@ def build_ass_subtitles(
             f"CreditTag,,0,0,0,,{escaped_credit}"
         )
 
-    # Reaction TitleBox / TitleOut
+    # Single unified banner (never stack TitleBox + HookBanner on top of each other!)
+    # In react/facecam split-screen, anchor cleanly on the y=730 seam so the streamer's face stays 100% clear!
+    anim_tags = r"\fad(0,180)\fscx92\fscy92\t(0,120,\fscx100\fscy100)"
     if reaction_title:
         masked_rt = mask_profanity(reaction_title, allow_profanity)
         escaped_rt = _escape_ass_text(masked_rt)
         if escaped_rt:
+            rt_tags = f"{{{seam_pos}{anim_tags}}}"
             events.append(
-                f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(min(clip_dur, 4.0))},"
-                f"TitleBox,,0,0,0,,{escaped_rt}"
+                f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(min(clip_dur, max(hook_dur, 3.5)))},"
+                f"TitleBox,,0,0,0,,{rt_tags}{escaped_rt}"
             )
-
-    # Hook Banner with animation
-    masked_hook = mask_profanity(hook_text, allow_profanity)
-    escaped_hook = _escape_ass_text(masked_hook)
-    if escaped_hook:
-        animated_hook_text = r"{\fad(0,180)\fscx92\fscy92\t(0,120,\fscx100\fscy100)}" + escaped_hook
-        events.append(
-            f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(hook_dur)},"
-            f"HookBanner,,0,0,0,,{animated_hook_text}"
-        )
+    else:
+        masked_hook = mask_profanity(hook_text, allow_profanity)
+        escaped_hook = _escape_ass_text(masked_hook)
+        if escaped_hook:
+            hook_tags = f"{{{seam_pos}{anim_tags}}}"
+            events.append(
+                f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(hook_dur)},"
+                f"HookBanner,,0,0,0,,{hook_tags}{escaped_hook}"
+            )
 
     prepared_cues = _normalize_and_chunk_cues(cues, total_duration_sec=clip_dur)
     for cue in prepared_cues:
