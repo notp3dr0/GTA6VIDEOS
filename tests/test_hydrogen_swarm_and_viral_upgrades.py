@@ -404,3 +404,70 @@ async def test_keyless_twitch_gql_discovery_and_hydrogen_parallel_swarm(tmp_path
     sched = DailyScheduler(cfg, store=store)
     job_ids = {j["id"] for j in sched.configure_jobs()}
     assert "hydrogen_questions_trends_6h" in job_ids
+
+
+@pytest.mark.asyncio
+async def test_kick_live_discovery_and_m3u8_resolution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify Kick public API v2 live discovery in ScoutAgent and direct .m3u8 resolution in downloader."""
+    import asyncio as _asyncio
+
+    from gta6_agents.agents.scout import ScoutAgent
+    from gta6_agents.video import downloader as dl_mod
+
+    kick_payload = json.dumps(
+        {
+            "slug": "coringa",
+            "playback_url": "https://fa723fc1b171.us-west-2.playback.live-video.net/api/video/v1/coringa.m3u8",
+            "livestream": {
+                "is_live": True,
+                "session_title": "GTA VI | DIA 2",
+                "viewer_count": 47374,
+                "categories": [{"name": "Grand Theft Auto VI"}],
+            },
+        }
+    ).encode("utf-8")
+
+    class _FakeProc:
+        returncode = 0
+
+        async def communicate(self):
+            return (kick_payload, b"")
+
+    async def _fake_exec(*_args, **_kwargs):
+        return _FakeProc()
+
+    monkeypatch.setattr(_asyncio, "create_subprocess_exec", _fake_exec)
+
+    base_cfg = _make_cfg(tmp_path)
+    cfg = base_cfg.model_copy(
+        update={"settings": {**base_cfg.settings, "scout": {"enable_kick_in_dry_run": True}}}
+    )
+    store = StateStore(cfg.data_dir, cfg.memory_dir)
+    scout = ScoutAgent(cfg, store)
+
+    cands = await scout._probe_kick_live(
+        {"handle": "@loud_coringa", "name": "LOUD Coringa", "priority": 95},
+        "https://kick.com/coringa",
+        capture_cfg={"clip_duration_sec": 25.0, "strict_gta6_only_filter": True},
+        blacklist=set(),
+        blocked_keywords=[],
+    )
+    assert len(cands) == 1
+    assert cands[0].source_type == "kick"
+    assert cands[0].creator_handle == "@loud_coringa"
+    assert cands[0].metadata["is_live"] is True
+    assert cands[0].metadata["canonical_url"] == "https://kick.com/coringa"
+    assert cands[0].metadata["viewer_count"] == 47374
+
+    # Also test downloader._resolve_direct_stream_urls for kick.com URLs
+    async def _fake_run_subproc(*_args, **_kwargs):
+        return (0, kick_payload.decode("utf-8"), "")
+
+    monkeypatch.setattr(dl_mod, "_run_subprocess", _fake_run_subproc)
+    urls = await dl_mod._resolve_direct_stream_urls("https://kick.com/coringa#live-0", is_live=True)
+    assert len(urls) == 1
+    assert urls[0].endswith("coringa.m3u8")
+

@@ -166,47 +166,112 @@ def detect_facecam_and_game_offset(
         var_v = sum((v - mean_v) ** 2 for v in vals) / n_fr
         std_img[idx] = var_v ** 0.5
 
-    # Check 4 standard streamer webcam corners for strong straight static border lines (Sobel/grad on median frame)
-    # Candidate boxes in 160x90 coords: (name, x0, y0, x1, y1, side, frac_box)
-    candidates = [
-        ("top_right", 112, 4, 156, 34, "right", (0.70, 0.04, 0.28, 0.34)),
-        ("bottom_right", 112, 56, 156, 86, "right", (0.70, 0.62, 0.28, 0.34)),
-        ("top_left", 4, 4, 48, 34, "left", (0.025, 0.04, 0.28, 0.34)),
-        ("bottom_left", 4, 56, 48, 86, "left", (0.025, 0.62, 0.28, 0.34)),
-    ]
-
+    # Dynamic static-edge corner scan across variable webcam sizes (15%..42% width, 18%..46% height)
+    # Works for ANY streamer (Coringa 24x28%, Alanzoka, Skorpion, Gaules, etc.) with ZERO OpenCV needed!
     mean_global_std = sum(std_img) / len(std_img)
+
+    # Precompute 1D edge gradients on the temporal-median frame (static webcam borders survive median; gameplay blurs!)
+    gx = [0] * (w_px * h_px)
+    gy = [0] * (w_px * h_px)
+    for y in range(1, h_px - 1):
+        row_off = y * w_px
+        for x in range(1, w_px - 1):
+            gx[row_off + x] = abs(med_img[row_off + x + 1] - med_img[row_off + x - 1])
+            gy[row_off + x] = abs(med_img[row_off + w_px + x] - med_img[row_off - w_px + x])
+
+    def _scan_corner(name: str, is_right: bool, is_bottom: bool) -> tuple[float, str, str, tuple[float, float, float, float]] | None:
+        # Search exact inner vertical border column (v_col) and inner horizontal border row (h_row)
+        v_range = range(int(w_px * 0.58), int(w_px * 0.85)) if is_right else range(int(w_px * 0.15), int(w_px * 0.42))
+        h_range = range(int(h_px * 0.52), int(h_px * 0.82)) if is_bottom else range(int(h_px * 0.18), int(h_px * 0.46))
+
+        best_v = (0.0, 0)
+        for vc in v_range:
+            y_lo = int(h_px * 0.60) if is_bottom else 2
+            y_hi = h_px - 2 if is_bottom else int(h_px * 0.30)
+            # Peak edge across 1px neighborhood to handle crisp or anti-aliased borders
+            vals = [max(gx[y * w_px + vc], gx[y * w_px + vc - 1], gx[y * w_px + vc + 1]) for y in range(y_lo, y_hi)]
+            # Combine average edge + fraction of strong edge pixels along the straight line
+            strong_frac = sum(1 for v in vals if v >= 16) / max(1, len(vals))
+            mean_e = sum(vals) / max(1, len(vals))
+            score = mean_e * (0.4 + 0.6 * strong_frac)
+            if score > best_v[0]:
+                best_v = (score, vc)
+
+        best_h = (0.0, 0)
+        for hr in h_range:
+            x_lo = best_v[1] if is_right else 2
+            x_hi = w_px - 2 if is_right else best_v[1]
+            if x_hi - x_lo < 16:
+                continue
+            vals = [max(gy[hr * w_px + x], gy[(hr - 1) * w_px + x], gy[(hr + 1) * w_px + x]) for x in range(x_lo, x_hi)]
+            strong_frac = sum(1 for v in vals if v >= 16) / max(1, len(vals))
+            mean_e = sum(vals) / max(1, len(vals))
+            score = mean_e * (0.4 + 0.6 * strong_frac)
+            if score > best_h[0]:
+                best_h = (score, hr)
+
+        vc = best_v[1]
+        hr = best_h[1]
+        if vc <= 0 or hr <= 0:
+            return None
+
+        # Re-evaluate vertical border strictly along the exact height of the detected corner box [y0..y1]
+        y0 = hr if is_bottom else 1
+        y1 = h_px - 1 if is_bottom else hr
+        x0 = vc if is_right else 1
+        x1 = w_px - 1 if is_right else vc
+        if (y1 - y0) < 14 or (x1 - x0) < 20:
+            return None
+
+        exact_v = [max(gx[y * w_px + vc], gx[y * w_px + vc - 1], gx[y * w_px + vc + 1]) for y in range(y0, y1)]
+        exact_h = [max(gy[hr * w_px + x], gy[(hr - 1) * w_px + x], gy[(hr + 1) * w_px + x]) for x in range(x0, x1)]
+        v_strong = sum(1 for v in exact_v if v >= 14) / max(1, len(exact_v))
+        h_strong = sum(1 for v in exact_h if v >= 14) / max(1, len(exact_h))
+        v_mean = sum(exact_v) / max(1, len(exact_v))
+        h_mean = sum(exact_h) / max(1, len(exact_h))
+
+        # Require BOTH straight edges to be consistent along >=65% of the box perimeter
+        if v_strong < 0.65 or h_strong < 0.65:
+            return None
+
+        border_strength = min(v_mean, h_mean)
+        if border_strength < 16.0:
+            return None
+
+        # Check outer edge inset (in case webcam has a 2-5% margin from screen edge)
+        fx = (vc / w_px) if is_right else 0.0
+        fy = (hr / h_px) if is_bottom else 0.0
+        fw = ((w_px - vc) / w_px) if is_right else (vc / w_px)
+        fh = ((h_px - hr) / h_px) if is_bottom else (hr / h_px)
+        # Tiny 1% trim inward to avoid including the 1px OBS border line in the cropped cam
+        fx = min(0.95, max(0.0, fx + (0.005 if is_right else 0.0)))
+        fy = min(0.95, max(0.0, fy + (0.005 if is_bottom else 0.0)))
+        fw = max(0.12, min(1.0 - fx, fw - 0.006))
+        fh = max(0.15, min(1.0 - fy, fh - 0.006))
+
+        side = "right" if is_right else "left"
+        return (border_strength, name, side, (round(fx, 4), round(fy, 4), round(fw, 4), round(fh, 4)))
+
+    corner_specs = [
+        ("top_left", False, False),
+        ("top_right", True, False),
+        ("bottom_left", False, True),
+        ("bottom_right", True, True),
+    ]
     best_corner: tuple[float, str, str, tuple[float, float, float, float]] | None = None
+    for cname, is_r, is_b in corner_specs:
+        hit = _scan_corner(cname, is_r, is_b)
+        if hit is not None and (best_corner is None or hit[0] > best_corner[0]):
+            best_corner = hit
 
-    for name, x0, y0, x1, y1, side, frac_box in candidates:
-        # Measure static straight-line edge contrast along the INNER vertical & horizontal borders of the corner box
-        v_col = x0 if side == "right" else x1
-        h_row = y1 if "top" in name else y0
-
-        v_edges = [
-            abs(med_img[y * w_px + min(w_px - 1, v_col + 1)] - med_img[y * w_px + max(0, v_col - 1)])
-            for y in range(max(1, y0), min(h_px - 1, y1))
-        ]
-        h_edges = [
-            abs(med_img[min(h_px - 1, h_row + 1) * w_px + x] - med_img[max(0, h_row - 1) * w_px + x])
-            for x in range(max(1, x0), min(w_px - 1, x1))
-        ]
-        v_score = sum(v_edges) / max(1, len(v_edges))
-        h_score = sum(h_edges) / max(1, len(h_edges))
-        border_strength = min(v_score, h_score)
-
-        # Also check that the interior of the corner differs from static gameplay outer frame
-        if border_strength >= 24.0:
-            if best_corner is None or border_strength > best_corner[0]:
-                best_corner = (border_strength, name, side, frac_box)
-
-    has_gp = mean_global_std >= 3.0
+    has_gp = mean_global_std >= 2.2
     if best_corner is not None:
         strength, cname, side, frac_box = best_corner
-        conf = min(0.95, round(strength / 60.0, 2))
+        conf = min(0.98, round(strength / 45.0, 2))
         scaled_gw = int(1920 * game_h_target / 1080) // 2 * 2
         max_gx = max(0, scaled_gw - game_w_target)
-        game_crop_x = max_gx if side == "left" else 0
+        # Keep gameplay cleanly clear of the webcam side (+2.8% safety margin so zero webcam edge sliver peeks in!)
+        game_crop_x = min(max_gx, int((frac_box[0] + frac_box[2] + 0.028) * scaled_gw)) if side == "left" else 0
         return FacecamDetection(
             mode="cam",
             box=frac_box,
@@ -214,7 +279,7 @@ def detect_facecam_and_game_offset(
             has_gameplay=has_gp,
             game_crop_x=game_crop_x,
             confidence=conf,
-            reason=f"Detected static {cname} webcam border (edge={strength:.1f})",
+            reason=f"Detected static {cname} webcam border (edge={strength:.1f}, box={frac_box})",
         )
 
     return FacecamDetection(

@@ -1175,13 +1175,151 @@ class ScoutAgent:
 
         return results
 
+    async def _probe_kick_live(
+        self,
+        streamer: dict[str, Any],
+        kick_url: str,
+        *,
+        capture_cfg: dict[str, Any],
+        blacklist: set[str],
+        blocked_keywords: list[str],
+        timeout_sec: float = 8.0,
+    ) -> list[SourceCandidate]:
+        """Probe Kick public channel API v2 to detect active PT-BR GTA VI livestreams (e.g. kick.com/coringa)."""
+        if self.config.dry_run and not self.config.settings.get("scout", {}).get("enable_kick_in_dry_run", False):
+            return []
+        slug_match = re.search(r"kick\.com/([A-Za-z0-9_-]+)", kick_url, re.IGNORECASE)
+        if not slug_match:
+            return []
+        slug = slug_match.group(1).lower()
+        api_url = f"https://kick.com/api/v2/channels/{slug}"
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "curl",
+                "-sS",
+                "-L",
+                "--max-time",
+                str(int(timeout_sec)),
+                "-H",
+                "User-Agent: Mozilla/5.0",
+                "-H",
+                "Accept: application/json",
+                api_url,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout_b, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec + 2.0)
+        except Exception:
+            return []
+
+        if (proc.returncode or 0) != 0 or not stdout_b:
+            return []
+
+        try:
+            data = json.loads(stdout_b.decode("utf-8", errors="replace"))
+        except json.JSONDecodeError:
+            return []
+
+        livestream = data.get("livestream")
+        if not isinstance(livestream, dict) or not livestream.get("is_live"):
+            return []
+
+        raw_title = str(livestream.get("session_title") or "").strip()
+        cats = livestream.get("categories") or []
+        cat_names = " ".join(
+            str(c.get("name") or "") for c in cats if isinstance(c, dict)
+        ).strip()
+        if not raw_title and not cat_names:
+            return []
+
+        handle = _ensure_at_handle(str(streamer.get("handle", f"@{slug}")))
+        streamer_name = str(streamer.get("name", handle.lstrip("@")))
+        priority_score = float(streamer.get("priority", 92.0))
+        clip_dur = float(capture_cfg.get("clip_duration_sec", 25.0))
+        strict_gta6 = bool(capture_cfg.get("strict_gta6_only_filter", True))
+
+        title = sanitize_untrusted_video_text(raw_title or f"{streamer_name} ao vivo jogando GTA VI", max_length=160)
+        summary = sanitize_untrusted_video_text(
+            f"Live ao vivo na Kick ({cat_names or 'GTA VI'}) com {streamer_name} ({handle}) em português.",
+            max_length=360,
+        )
+        combined = f"{title} {cat_names} {summary}"
+        if _NON_GTA6_GAME_RE.search(combined):
+            return []
+        if strict_gta6 and not _GTA6_STRICT_RE.search(combined):
+            return []
+        if self._is_blocked_content(handle, title, summary, blacklist, blocked_keywords):
+            return []
+
+        from datetime import datetime, timezone
+
+        now_dt = datetime.now(timezone.utc)
+        now_ts = now_dt.timestamp()
+        live_bucket = now_dt.strftime("%Y%m%d%H%M")[:-1] + "0"
+        canonical_url = f"https://kick.com/{slug}"
+        seg_url = f"{canonical_url}#live-{live_bucket}"
+        if self.store.is_source_seen(seg_url):
+            return []
+
+        viewers = int(livestream.get("viewer_count") or 0)
+        freshness_score = self._compute_freshness_score(
+            is_live=True,
+            published_ts=now_ts,
+            now_ts=now_ts,
+            playlist_rank=0,
+        )
+        viewer_bonus = min(6.0, viewers / 10000.0)
+        score = self._score_candidate(
+            base_score=min(96.0, max(82.0, priority_score * 0.92)),
+            title=title,
+            summary=summary,
+            is_official=False,
+            is_campaign_acervo=False,
+            is_whitelisted=True,
+            engagement_bonus=min(8.0, (freshness_score / 12.5) + viewer_bonus),
+        )
+        return [
+            SourceCandidate(
+                title=f"{streamer_name} AO VIVO — {title}"[:160],
+                url=seg_url,
+                creator_handle=handle,
+                source_type="kick",
+                is_official=False,
+                is_campaign_acervo=False,
+                pillar=ContentPillar.GAMEPLAY_CLIPS,
+                summary=summary,
+                verified_facts=[
+                    f"Corte capturado ao vivo na Kick da transmissão em português de {streamer_name} ({handle}).",
+                    "Fonte pública verificada (kick).",
+                ],
+                suggested_start_sec=0.0,
+                suggested_end_sec=clip_dur,
+                virality_score=score,
+                metadata={
+                    "canonical_url": canonical_url,
+                    "is_live": True,
+                    "streamer_br": True,
+                    "streamer_name": streamer_name,
+                    "platform": "kick",
+                    "viewer_count": viewers,
+                    "playback_url": str(data.get("playback_url") or ""),
+                    "published_ts": now_ts,
+                    "upload_date": now_dt.strftime("%Y-%m-%d"),
+                    "age_hours": 0.0,
+                    "playlist_rank": 0,
+                    "freshness_score": freshness_score,
+                },
+            )
+        ]
+
     async def discover_br_streamer_streams(
         self,
         blacklist: set[str],
         blocked_keywords: list[str],
         max_streamers: int = 10,
     ) -> list[SourceCandidate]:
-        """Discover active GTA VI lives & newest VODs across all configured Brazilian streamers (YouTube + Twitch)."""
+        """Discover active GTA VI lives & newest VODs across all configured Brazilian streamers (Kick + YouTube + Twitch)."""
         capture_cfg, streamers = self._load_streamers_br_config()
         if not streamers:
             return []
@@ -1189,6 +1327,17 @@ class ScoutAgent:
         ordered = sorted(streamers, key=lambda s: float(s.get("priority", 0)), reverse=True)[:max_streamers]
         tasks = []
         for st in ordered:
+            kick_url = str(st.get("kick_live_url") or "").strip()
+            if kick_url:
+                tasks.append(
+                    self._probe_kick_live(
+                        st,
+                        kick_url,
+                        capture_cfg=capture_cfg,
+                        blacklist=blacklist,
+                        blocked_keywords=blocked_keywords,
+                    )
+                )
             for key, is_live_ep in (
                 ("youtube_live_url", True),
                 ("twitch_live_url", True),

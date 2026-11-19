@@ -84,11 +84,12 @@ streamers_br:
   - handle: "@loud_coringa"
     name: "LOUD Coringa"
     priority: 95
-    youtube_live_url: "https://www.youtube.com/@loud_coringa/live"
-    youtube_streams_url: "https://www.youtube.com/@loud_coringa/streams"
-    youtube_videos_url: "https://www.youtube.com/@loud_coringa/videos"
-    twitch_live_url: "https://www.twitch.tv/loud_coringa"
-    twitch_vods_url: "https://www.twitch.tv/loud_coringa/videos?filter=archives&sort=time"
+    kick_live_url: "https://kick.com/coringa"
+    youtube_live_url: "https://www.youtube.com/@coringa/live"
+    youtube_streams_url: "https://www.youtube.com/@coringa/streams"
+    youtube_videos_url: "https://www.youtube.com/@coringa/videos"
+    twitch_live_url: "https://www.twitch.tv/coringa"
+    twitch_vods_url: "https://www.twitch.tv/coringa/videos?filter=archives&sort=time"
 
   - handle: "@funkyblackcat"
     name: "FunkyBlackCat"

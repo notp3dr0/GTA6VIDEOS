@@ -174,7 +174,25 @@ async def probe_stream_metadata(url: str, timeout_sec: float = 15.0) -> dict[str
 
 
 async def _resolve_direct_stream_urls(url: str, *, is_live: bool = False) -> list[str]:
-    """Use `yt-dlp -g` to obtain direct HLS (.m3u8) or HTTP MP4/WebM stream URLs."""
+    """Use Kick public API (for kick.com live) or `yt-dlp -g` to obtain direct HLS (.m3u8) or HTTP MP4/WebM stream URLs."""
+    clean_url = (url or "").strip().split("#", 1)[0]
+    if "kick.com/" in clean_url.lower():
+        slug = clean_url.rstrip("/").split("/")[-1].split("?")[0].strip()
+        if slug:
+            try:
+                api_url = f"https://kick.com/api/v2/channels/{slug}"
+                rc_c, out_c, _ = await _run_subprocess(
+                    ["curl", "-sS", "--max-time", "8", "-H", "User-Agent: Mozilla/5.0", api_url],
+                    timeout_sec=10.0,
+                )
+                if rc_c == 0 and out_c.strip().startswith("{"):
+                    kdata = json.loads(out_c)
+                    pb = str(kdata.get("playback_url") or "").strip()
+                    if pb.startswith("http") and kdata.get("livestream"):
+                        return [pb]
+            except Exception as exc:
+                logger.debug("Kick direct API resolve fallback for %s: %s", slug, exc)
+
     fmt = YTDLP_LIVE_HLS_FORMAT if is_live else YTDLP_1080P_FORMAT
     cmd = [
         *_resolve_ytdlp_cmd(),
@@ -185,7 +203,7 @@ async def _resolve_direct_stream_urls(url: str, *, is_live: bool = False) -> lis
         "-f",
         fmt,
         "-g",
-        url,
+        clean_url,
     ]
     rc, out, _ = await _run_subprocess(cmd, timeout_sec=25.0)
     if rc != 0 or not out.strip():
