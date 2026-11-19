@@ -248,8 +248,8 @@ def build_ass_subtitles(
                 "&H40000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,1,60,60,380,1"
             ),
             (
-                "Style: TitleBox,DejaVu Sans,46,&H00000000,&H00000000,"
-                "&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,5,65,65,140,1"
+                "Style: TitleBox,DejaVu Sans,44,&H00000000,&H00000000,"
+                "&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,14,0,5,55,55,140,1"
             ),
             (
                 "Style: TitleOut,DejaVu Sans,44,&H00FFFFFF,&H0000EAFF,"
@@ -273,15 +273,16 @@ def build_ass_subtitles(
         )
 
     # Single unified banner (never stack TitleBox + HookBanner on top of each other!)
-    # In react/facecam split-screen, anchor cleanly on the y=730 seam so the streamer's face stays 100% clear!
+    # In react/facecam split-screen, anchor cleanly on the y=730 seam so the streamer's face & gameplay stay 100% clear!
     anim_tags = r"\fad(0,180)\fscx92\fscy92\t(0,120,\fscx100\fscy100)"
     if reaction_title:
         masked_rt = mask_profanity(reaction_title, allow_profanity)
         escaped_rt = _escape_ass_text(masked_rt)
         if escaped_rt:
+            rt_end = clip_dur if is_split else min(clip_dur, max(hook_dur, 3.5))
             rt_tags = f"{{{seam_pos}{anim_tags}}}"
             events.append(
-                f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(min(clip_dur, max(hook_dur, 3.5)))},"
+                f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(rt_end)},"
                 f"TitleBox,,0,0,0,,{rt_tags}{escaped_rt}"
             )
     else:

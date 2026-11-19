@@ -279,8 +279,20 @@ class ClipperEditorAgent:
         hydrogen_meta = src_meta.get("hydrogen_enrichment") or {}
         hook_meta = hydrogen_meta.get("hook") if isinstance(hydrogen_meta, dict) else {}
         reaction_title = ""
-        if effective_layout == "react" and not plan.for_real_oficial_campaign and isinstance(hook_meta, dict):
-            reaction_title = str(hook_meta.get("reaction_title") or "")[:64]
+        if effective_layout in ("react", "facecam"):
+            if isinstance(hook_meta, dict) and str(hook_meta.get("reaction_title") or "").strip():
+                reaction_title = str(hook_meta.get("reaction_title") or "").strip()[:72]
+            else:
+                from gta6_agents.agents.hydrogen_swarm import craft_viral_hook
+
+                auto_hook = await craft_viral_hook(
+                    plan.source,
+                    for_campaign=plan.for_real_oficial_campaign,
+                    prefer_reaction_title=True,
+                    dry_run=self.config.dry_run,
+                    transcript_snippet=joined_speech,
+                )
+                reaction_title = str(auto_hook.get("reaction_title") or hook_text_resolved).strip()[:72]
 
         hook_text = hook_text_resolved if burn_hook else ""
         ass_cues = cues if burn_captions else []

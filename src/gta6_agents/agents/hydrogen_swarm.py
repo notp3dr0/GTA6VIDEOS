@@ -43,20 +43,80 @@ ANTI_CLICKBAIT_RE = re.compile(
     re.I,
 )
 
+ROBOTIC_PREFIX_RE = re.compile(
+    r"^\s*(?:corte\s+da\s+live(?:\s+de\s+gta\s*(?:6|vi))?|ao\s+vivo\s+no\s+gta\s*(?:6|vi)|"
+    r"oficial\s+no\s+gta\s*(?:6|vi)|dica\s+de\s+gta\s*(?:6|vi)|raio-x\s+de\s+leonida|"
+    r"resumo\s+gta\s*(?:6|vi))\s*[:\-—]\s*",
+    re.I,
+)
+
 BANNED_CAMPAIGN_RE = re.compile(r"\b(gta\s*5|gta\s*v|ps3|xbox\s*360|negativ|hype\s*mort|ruim)\b", re.I)
+
+STREAMER_NICKNAMES_BR: dict[str, str] = {
+    "loud_coringa": "coringa",
+    "coringa": "coringa",
+    "alanzoka": "alanzoka",
+    "skorpionoficial": "skorpion",
+    "skorpion": "skorpion",
+    "gamercosta": "gamer costa",
+    "paulinholokooficial": "paulinho",
+    "paulinholokobr": "paulinho",
+    "paulinho": "paulinho",
+    "funkyblackcat": "funky",
+    "gaules": "gaules",
+    "luquet4": "luquet4",
+    "brksedu": "edu",
+    "gameplayrj": "davy",
+    "youtube": "",
+    "rockstargames": "",
+}
+
+
+def friendly_streamer_name(handle_or_name: str, fallback_text: str = "") -> str:
+    """Resolve a natural lowercase Brazilian streamer nickname (e.g. '@loud_coringa' -> 'coringa')."""
+    raw = (handle_or_name or "").strip().lstrip("@")
+    key = re.sub(r"[^a-z0-9_]", "", raw.lower())
+    if key in STREAMER_NICKNAMES_BR:
+        mapped = STREAMER_NICKNAMES_BR[key]
+        if mapped:
+            return mapped
+    # Check if a known BR streamer name appears inside title/fallback_text
+    probe = f"{raw} {fallback_text}".lower()
+    for alias, nick in (
+        ("coringa", "coringa"),
+        ("alanzoka", "alanzoka"),
+        ("skorpion", "skorpion"),
+        ("gamer costa", "gamer costa"),
+        ("paulinho", "paulinho"),
+        ("funky", "funky"),
+        ("gaules", "gaules"),
+        ("luquet4", "luquet4"),
+        ("brksedu", "edu"),
+    ):
+        if alias in probe:
+            return nick
+    if key in ("", "youtube", "rockstargames", "gta6", "streamer"):
+        return ""
+    # Trim noisy suffixes like 'oficial', 'br', 'gamer'
+    cleaned = re.sub(r"(?:oficial|tv|br|live|gamer)$", "", raw, flags=re.I).strip(" _-")
+    return (cleaned or raw).lower()
 
 
 def validate_and_polish_hook(
     hook: str, *, for_campaign: bool = False, streamer_name: str = ""
 ) -> tuple[str, list[str]]:
-    """Enforces 3-9 words (<= 58 chars), strips clickbait filler, and campaign rules."""
+    """Enforces punchy casual BR clip titles, strips robotic prefixes/clickbait filler, and campaign rules."""
     warnings: list[str] = []
     clean = hook.strip()
+
+    # Strip robotic news-style prefixes
+    if ROBOTIC_PREFIX_RE.search(clean):
+        clean = ROBOTIC_PREFIX_RE.sub("", clean).strip()
 
     # Check clickbait/filler
     if ANTI_CLICKBAIT_RE.search(clean):
         warnings.append("Detected banned clickbait filler or generic label; sanitizing.")
-        clean = ANTI_CLICKBAIT_RE.sub("", clean).strip()
+        clean = ANTI_CLICKBAIT_RE.sub("", clean).strip(" :;-—")
 
     # Check campaign rules
     if for_campaign and BANNED_CAMPAIGN_RE.search(clean):
@@ -65,14 +125,98 @@ def validate_and_polish_hook(
 
     # Word count check
     words = clean.split()
-    if len(words) < 3 or len(words) > 9:
-        warnings.append(f"Hook word count {len(words)} outside ideal 3-9 range.")
+    if len(words) < 3 or len(words) > 10:
+        warnings.append(f"Hook word count {len(words)} outside ideal 3-10 range.")
 
-    if len(clean) > 58:
-        warnings.append(f"Hook length {len(clean)} chars exceeds 58 limit.")
-        clean = clean[:58].rsplit(" ", 1)[0]
+    max_chars = 72 if re.search(r"k{4,}$", clean, re.I) else 58
+    if len(clean) > max_chars:
+        warnings.append(f"Hook length {len(clean)} chars exceeds {max_chars} limit.")
+        if re.search(r"k{5,}$", clean, re.I):
+            clean = clean[:max_chars]
+        else:
+            clean = clean[:max_chars].rsplit(" ", 1)[0]
 
     return clean, warnings
+
+
+def _build_casual_br_clip_title(
+    streamer: str,
+    context_text: str,
+    seed_key: str,
+) -> tuple[str, str]:
+    """Build a spontaneous, lowercase, ultra-direct Brazilian TikTok/Reels clip title."""
+    import hashlib
+
+    ctx = context_text.lower()
+    idx = int(hashlib.md5((seed_key or ctx or "gta6").encode("utf-8")).hexdigest()[:8], 16)
+
+    if streamer:
+        if any(k in ctx for k in ("anim", "legal", "uuh", "empolg", "sorri", "curti", "bom demais")):
+            pool = [
+                f"o {streamer} até animou kkkkkkkkkkkkkkkkkkkkkkk",
+                f"a reação do {streamer} vendo isso kkkkkkkkkkkkkk",
+                f"o {streamer} ganhou o dia nessa hora kkkkkkkkkk",
+            ]
+            arch = "creator_spotlight"
+        elif any(k in ctx for k in ("navinha", "nave", "interior", "carro", "motor", "drift", "moto", "veículo")):
+            pool = [
+                f"o {streamer} até animou vendo a nave kkkkkkkkkkk",
+                f"a cara do {streamer} entrando na navinha kkkkkkk",
+                f"o {streamer} travou olhando esse carro kkkkkkkkk",
+            ]
+            arch = "creator_spotlight"
+        elif any(k in ctx for k in ("polícia", "policia", "fuga", "cop", "persegui", "capot", "batida")):
+            pool = [
+                f"o {streamer} achou que ia fugir kkkkkkkkkkkkkkk",
+                f"o {streamer} não tankou a polícia kkkkkkkkkkkkk",
+                f"mano olha o que o {streamer} fez nessa fuga kkkkk",
+            ]
+            arch = "situation"
+        elif any(k in ctx for k in ("npc", "praia", "vice beach", "grassrivers", "mapa", "segredo", "escondid")):
+            pool = [
+                f"o {streamer} parou tudo só pra ver isso kkkkkkk",
+                f"olha o que o {streamer} achou do nada kkkkkkkkk",
+                f"o {streamer} ficou em choque com esse detalhe kkkk",
+            ]
+            arch = "shock_fact"
+        elif any(k in ctx for k in ("rindo", "risada", "kkkk", "chat", "resenha", "caos", "engraçad")):
+            pool = [
+                f"o {streamer} não tankou kkkkkkkkkkkkkkkkkkkkkkk",
+                f"o {streamer} perdeu tudo nessa hora kkkkkkkkkkk",
+                f"o chat do {streamer} foi à loucura kkkkkkkkkkkk",
+            ]
+            arch = "creator_spotlight"
+        else:
+            pool = [
+                f"o {streamer} até animou kkkkkkkkkkkkkkkkkkkkkkk",
+                f"a cara do {streamer} vendo isso ao vivo kkkkkkk",
+                f"o {streamer} simplesmente travou nessa cena kkkk",
+                f"mano o {streamer} não acreditou nisso kkkkkkkkk",
+            ]
+            arch = "creator_spotlight"
+    else:
+        if any(k in ctx for k in ("carro", "nave", "drift", "motor", "veículo")):
+            pool = [
+                "a física desse carro tá absurda kkkkkkkkkkkkkk",
+                "olha o interior dessa nave no gta 6 kkkkkkkkkk",
+            ]
+            arch = "shock_fact"
+        elif any(k in ctx for k in ("polícia", "policia", "fuga", "persegui")):
+            pool = [
+                "achou que ia escapar da polícia kkkkkkkkkkkkkk",
+                "a fuga mais caótica ao vivo kkkkkkkkkkkkkkkkkk",
+            ]
+            arch = "situation"
+        else:
+            pool = [
+                "olha a reação ao vivo nessa cena kkkkkkkkkkkkk",
+                "ninguém esperava isso acontecer ao vivo kkkkkk",
+                "o chat foi à loucura nessa hora kkkkkkkkkkkkk",
+            ]
+            arch = "shock_fact"
+
+    chosen = pool[idx % len(pool)]
+    return chosen, arch
 
 
 async def craft_viral_hook(
@@ -83,58 +227,58 @@ async def craft_viral_hook(
     prefer_reaction_title: bool = False,
     dry_run: bool = True,
     model_router: TieredModelRouter | None = None,
+    transcript_snippet: str = "",
 ) -> dict[str, str]:
-    """Crafts a viral hook and reaction title using Hydrogen LLM or deterministic fallback."""
+    """Crafts a spontaneous, casual Brazilian TikTok/Reels clip title using Hydrogen LLM or deterministic fallback."""
     router = model_router or TieredModelRouter()
-    
+    streamer = friendly_streamer_name(
+        str(candidate.metadata.get("streamer_name") or candidate.creator_handle),
+        fallback_text=f"{candidate.title} {candidate.summary}",
+    )
+    context_text = f"{candidate.title} {candidate.summary} {transcript_snippet}".strip()
+
     # Fallback deterministic generation if dry_run or router fails
     if dry_run or not router.hydrogen_provider:
-        title_lower = candidate.title.lower()
-        if prefer_reaction_title or candidate.creator_handle:
-            streamer = candidate.creator_handle.lstrip("@") or "Streamer"
-            reaction = f"{streamer} PERDEU A LINHA com os gráficos de GTA 6"
-            hook = "Detalhes que ninguém percebeu"
-            archetype = "creator_spotlight"
-        elif "car" in title_lower or "veículo" in title_lower or "carro" in title_lower:
-            hook = "Carro raro escondido à vista de todos"
-            reaction = "Encontrei o carro mais raro de Leonida"
-            archetype = "shock_fact"
-        elif "cop" in title_lower or "polícia" in title_lower or "fuga" in title_lower:
-            hook = "Quando a polícia cerca o lugar errado"
-            reaction = "A perseguição mais insana de GTA 6"
-            archetype = "situation"
-        else:
-            hook = "3 detalhes insanos em GTA 6"
-            reaction = "Segredos absurdos revelados em Leonida"
-            archetype = "number_promise"
-        
-        clean_hook, _ = validate_and_polish_hook(hook, for_campaign=for_campaign)
+        casual_title, archetype = _build_casual_br_clip_title(
+            streamer=streamer,
+            context_text=context_text,
+            seed_key=f"{candidate.url}|{candidate.title}|{transcript_snippet[:60]}",
+        )
+        clean_hook, _ = validate_and_polish_hook(casual_title, for_campaign=for_campaign)
         return {
             "archetype": archetype,
             "hook_on_screen": clean_hook,
-            "reaction_title": reaction,
+            "reaction_title": clean_hook,
         }
 
-    # Hydrogen LLM Prompt
+    # Hydrogen LLM Prompt — trained specifically on authentic viral Brazilian live-clip pages
     system_prompt = (
-        "You are an expert GTA 6 viral content hook writer. "
-        "Return strict JSON with keys: archetype, hook_on_screen, reaction_title. "
-        "Create 1 punchy Brazilian Portuguese on-screen hook (3-9 words, sentence case) "
-        "and 1 Twitch-style reaction title (streamer name + reaction verb + 2-3 CAPS words). "
-        "Never use clickbaiting phrases like 'wait for it' or 'espere até o final'. "
-        "Never mention GTA 5 or negative hype if for_campaign is true."
+        "Você é um editor brasileiro raiz de páginas virais de cortes de live no TikTok e Instagram Reels. "
+        "Retorne JSON estrito com as chaves: archetype, hook_on_screen, reaction_title. "
+        "ESTILO OBRIGATÓRIO DOS TÍTULOS:\n"
+        "- Escreva de forma MUITO solta, direta, espontânea e pontual ao momento exato da cena/fala.\n"
+        "- Use letras minúsculas naturais (ZERO CAPS robótico, ZERO título jornalístico tipo 'REAGINDO A...', 'CORTE DA LIVE:', 'AO VIVO NO GTA VI:').\n"
+        "- Curto e certeiro (3 a 8 palavras), podendo fechar com risada natural 'kkkkkkkkkkkkk' quando combinar com a reação.\n"
+        "- Bons exemplos reais:\n"
+        "  * 'o coringa até animou kkkkkkkkkkkkkkkkkkkkkkkkk'\n"
+        "  * 'a cara do alanzoka vendo o interior da nave kkkkkkk'\n"
+        "  * 'o skorpion simplesmente travou nessa cena kkkkkkkkk'\n"
+        "  * 'o paulinho achou que ia fugir da polícia kkkkkkkk'\n"
+        "  * 'o chat foi à loucura nessa hora kkkkkkkkkkkkk'\n"
+        "- Nunca use clickbait genérico ('espere até o final', 'você não vai acreditar').\n"
+        "- Se for_campaign=true: tom 100% positivo/hype, NUNCA cite GTA 5/V, bugs, críticas ou memes negativos."
     )
     prompt = (
-        f"Candidate Title: {candidate.title}\n"
-        f"Summary: {candidate.summary}\n"
-        f"Creator: {candidate.creator_handle}\n"
-        f"Channel Angle: {channel_angle}\n"
+        f"Streamer: {streamer or 'criador da live'}\n"
+        f"Título/Contexto da live: {candidate.title}\n"
+        f"Resumo: {candidate.summary}\n"
+        f"Fala real transcrita do corte: {transcript_snippet[:260] or '(sem transcrição ainda)'}\n"
+        f"Ângulo do canal: {channel_angle}\n"
         f"For Campaign: {for_campaign}\n"
-        f"Prefer Reaction Title: {prefer_reaction_title}\n"
-        'Respond ONLY with JSON: {"archetype": "...", "hook_on_screen": "...", "reaction_title": "..."}'
+        'Responda APENAS com JSON: {"archetype": "...", "hook_on_screen": "...", "reaction_title": "..."}'
     )
 
-    response = await router.complete(prompt, system=system_prompt, tier=TaskTier.HYDROGEN, temperature=0.5)
+    response = await router.complete(prompt, system=system_prompt, tier=TaskTier.HYDROGEN, temperature=0.7)
     if not response:
         return await craft_viral_hook(
             candidate,
@@ -142,13 +286,18 @@ async def craft_viral_hook(
             for_campaign=for_campaign,
             prefer_reaction_title=prefer_reaction_title,
             dry_run=True,
+            transcript_snippet=transcript_snippet,
         )
 
     import json as _json
 
-    archetype = "shock_fact"
-    hook_on_screen = "Detalhes insanos ao vivo em GTA 6"
-    reaction_title = f"{candidate.creator_handle.lstrip('@') or 'Streamer'} SURPRESO com GTA 6"
+    fallback_title, archetype = _build_casual_br_clip_title(
+        streamer=streamer,
+        context_text=context_text,
+        seed_key=f"{candidate.url}|{candidate.title}",
+    )
+    hook_on_screen = fallback_title
+    reaction_title = fallback_title
 
     match = re.search(r"\{.*\}", response, flags=re.DOTALL)
     if match:
@@ -165,12 +314,15 @@ async def craft_viral_hook(
             pass
 
     clean_hook, _ = validate_and_polish_hook(hook_on_screen, for_campaign=for_campaign)
+    clean_reaction, _ = validate_and_polish_hook(reaction_title or clean_hook, for_campaign=for_campaign)
     if len(clean_hook.split()) < 3:
-        clean_hook = "Detalhes insanos ao vivo em GTA 6"
+        clean_hook = fallback_title
+    if len(clean_reaction.split()) < 3:
+        clean_reaction = clean_hook
     return {
         "archetype": archetype,
         "hook_on_screen": clean_hook,
-        "reaction_title": reaction_title[:80],
+        "reaction_title": clean_reaction[:72],
     }
 
 

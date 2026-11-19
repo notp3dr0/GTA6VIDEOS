@@ -471,3 +471,38 @@ async def test_kick_live_discovery_and_m3u8_resolution(
     assert len(urls) == 1
     assert urls[0].endswith("coringa.m3u8")
 
+
+@pytest.mark.asyncio
+async def test_casual_br_clip_titles_are_spontaneous_and_non_robotic() -> None:
+    """Verify titles use natural lowercase BR clip phrasing instead of robotic corporate/news headers."""
+    from gta6_agents.agents.hydrogen_swarm import (
+        craft_viral_hook,
+        friendly_streamer_name,
+        validate_and_polish_hook,
+    )
+
+    assert friendly_streamer_name("@loud_coringa") == "coringa"
+    assert friendly_streamer_name("@PaulinhoLOKOoficial") == "paulinho"
+    assert friendly_streamer_name("@SkorpionOFICIAL") == "skorpion"
+
+    cleaned, _ = validate_and_polish_hook("CORTE DA LIVE DE GTA 6: o coringa até animou kkkkkkkkkk")
+    assert cleaned == "o coringa até animou kkkkkkkkkk"
+
+    cand = SourceCandidate(
+        title="LOUD Coringa AO VIVO — GTA VI | DIA 2",
+        url="https://kick.com/coringa#test-casual",
+        creator_handle="@loud_coringa",
+        summary="Coringa jogando GTA VI",
+    )
+    hook = await craft_viral_hook(
+        cand,
+        dry_run=True,
+        transcript_snippet="Nossa, olha o interior da navinha! Uuh, tá ficando legal!",
+    )
+    rt = hook["reaction_title"]
+    assert rt == rt.lower(), f"Expected casual lowercase title, got: {rt}"
+    assert "coringa" in rt
+    assert "kkkk" in rt
+    assert "REAGINDO" not in rt and "CORTE DA LIVE" not in rt
+
+

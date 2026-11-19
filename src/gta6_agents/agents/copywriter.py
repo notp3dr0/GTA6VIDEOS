@@ -330,9 +330,17 @@ class ScriptCopyAgent:
         language: str,
         spoiler: bool,
         is_campaign: bool = False,
+        creator_handle: str = "",
     ) -> tuple[str, str, str]:
+        from gta6_agents.agents.hydrogen_swarm import (
+            _build_casual_br_clip_title,
+            friendly_streamer_name,
+        )
+
+        streamer_nick = friendly_streamer_name(creator_handle, fallback_text=f"{clean_title} {clean_summary}")
+
         if is_campaign:
-            camp_topic = _clean_campaign_text(clean_title, 42) or "Momento épico em Leonida"
+            camp_topic = _clean_campaign_text(clean_title, 42) or "momento absurdo em leonida"
             raw_fact = clean_facts[0] if clean_facts else clean_summary
             camp_fact = (
                 _clean_campaign_text(raw_fact, 130)
@@ -341,7 +349,12 @@ class ScriptCopyAgent:
             camp_secondary = (
                 _clean_campaign_text(clean_facts[1], 110) if len(clean_facts) > 1 else ""
             )
-            hook = _truncate_clean(f"AO VIVO NO GTA VI: {camp_topic}", 60)
+            casual_hook, _ = _build_casual_br_clip_title(
+                streamer=streamer_nick,
+                context_text=f"{camp_topic} {camp_fact}",
+                seed_key=f"camp|{clean_title}|{camp_fact[:40]}",
+            )
+            hook = _clean_campaign_text(casual_hook, 64) or "olha essa reação ao vivo kkkkkkkkkkkkk"
             vo_parts_camp = [
                 f"Olha essa reação insana ao vivo em {camp_topic}!",
                 camp_fact.rstrip(".") + ".",
@@ -352,7 +365,7 @@ class ScriptCopyAgent:
                 "O nível de imersão em Vice City está simplesmente surreal!"
             )
             voiceover = " ".join(vo_parts_camp)
-            overlay = _truncate_clean(f"Destaque ao vivo • {camp_fact}", 100)
+            overlay = _truncate_clean(f"{hook} • {camp_fact}", 100)
             return hook, voiceover, overlay
 
         is_pt = language.lower().startswith("pt")
@@ -373,19 +386,14 @@ class ScriptCopyAgent:
         secondary_fact = clean_facts[1] if len(clean_facts) > 1 else ""
 
         if is_pt:
-            pillar_hooks: dict[ContentPillar, str] = {
-                ContentPillar.OFFICIAL_NEWS: f"OFICIAL NO GTA 6: {topic_short}",
-                ContentPillar.TIPS_TUTORIALS: f"DICA DE GTA 6: {topic_short}",
-                ContentPillar.GAMEPLAY_CLIPS: f"CORTE DA LIVE DE GTA 6: {topic_short}",
-                ContentPillar.GTA5_NOSTALGIA: f"13 ANOS DE EVOLUÇÃO: {topic_short}",
-                ContentPillar.SPOTLIGHTS: f"RAIO-X DE LEONIDA: {topic_short}",
-                ContentPillar.COUNTDOWN_RECAP: f"RESUMO GTA 6: {topic_short}",
-                ContentPillar.QUESTIONS: f"QUAL SUA ESCOLHA EM LEONIDA? {topic_short}",
-                ContentPillar.REAL_OFICIAL_CAMPAIGN: f"AO VIVO NO GTA VI: {topic_short}",
-            }
-            hook = _truncate_clean(pillar_hooks.get(pillar, f"GTA 6: {topic_short}"), 64)
+            casual_hook, _ = _build_casual_br_clip_title(
+                streamer=streamer_nick,
+                context_text=f"{clean_title} {primary_fact}",
+                seed_key=f"{pillar.value}|{clean_title}|{creator_handle}",
+            )
+            hook = _truncate_clean(casual_hook, 68)
             if spoiler and not hook.upper().startswith("⚠️ SPOILER"):
-                hook = _truncate_clean(f"⚠️ SPOILER — {hook}", 64)
+                hook = _truncate_clean(f"⚠️ spoiler — {hook}", 68)
 
             vo_parts = [
                 f"Olha esse momento em {topic_short}.",
@@ -397,7 +405,7 @@ class ScriptCopyAgent:
                 "A atenção aos detalhes em Leonida muda completamente a imersão. Você tinha reparado nisso?"
             )
             voiceover = " ".join(vo_parts)
-            overlay = _truncate_clean(f"Análise verificada • {primary_fact}", 110)
+            overlay = _truncate_clean(f"{hook} • {primary_fact}", 110)
         else:
             pillar_hooks_en: dict[ContentPillar, str] = {
                 ContentPillar.OFFICIAL_NEWS: f"OFFICIAL GTA 6 DETAIL: {topic_short}",
@@ -481,15 +489,27 @@ class ScriptCopyAgent:
             language=lang,
             spoiler=spoiler_required,
             is_campaign=is_campaign,
+            creator_handle=str(source.metadata.get("streamer_name") or source.creator_handle),
         )
 
         # Optional LLM enhancement with strict validation fallback
         if is_campaign:
             sys_prompt = (
-                "Você escreve roteiros curtos em PT-BR para cortes oficiais da Live YouTube x GTA VI. "
-                "Tom 100% positivo e empolgado. PROIBIDO mencionar GTA V/5, San Andreas, Los Santos, "
-                "'antes do GTA 6', críticas/bugs, arrobas (@), logos ou hashtags. Retorne JSON com: "
-                "hook_on_screen (<=56 chars, gancho de 2s), voiceover_script (30-55 palavras), commentary_overlay (<=95 chars)."
+                "Você é um clipador brasileiro criando títulos super soltos e pontuais para cortes da Live YouTube x GTA VI no TikTok/Reels. "
+                "Estilo obrigatório para hook_on_screen: minúsculo, espontâneo, humano e direto ao ponto — ex: "
+                "'o skorpion até animou kkkkkkkkkkkkkkkkk', 'a cara dele vendo isso ao vivo kkkkkkkk'. "
+                "ZERO título robótico/jornalístico, ZERO CAPS exagerado. "
+                "Tom 100% positivo/hype. PROIBIDO mencionar GTA V/5, San Andreas, Los Santos, 'antes do GTA 6', críticas/bugs, arrobas (@), logos ou hashtags. "
+                "Retorne JSON com: hook_on_screen (<=64 chars), voiceover_script (30-55 palavras), commentary_overlay (<=95 chars)."
+            )
+        elif lang.lower().startswith("pt"):
+            sys_prompt = (
+                "Você é um clipador brasileiro raiz criando títulos de cortes de live de GTA VI para TikTok/Reels. "
+                "Estilo obrigatório para hook_on_screen: super solto, minúsculo, engraçado/pontual ao momento exato — ex: "
+                "'o coringa até animou kkkkkkkkkkkkkkkkk', 'o alanzoka não tankou essa cena kkkkkkkk', 'a cara do paulinho vendo isso kkkkkkk'. "
+                "NUNCA use formato robótico tipo 'CORTE DA LIVE:' ou 'Streamer REAGINDO a...'. "
+                "Nunca invente vazamentos nem fale em nome da Rockstar. Retorne JSON com: "
+                "hook_on_screen (<=68 chars), voiceover_script (30-55 palavras), commentary_overlay (<=100 chars)."
             )
         else:
             sys_prompt = (
@@ -502,17 +522,17 @@ class ScriptCopyAgent:
         llm_data = await self._call_llm_json(
             system_prompt=sys_prompt,
             user_prompt=(
-                f"Language: {lang}\nPillar: {pillar.value}\nTitle: {clean_title}\n"
+                f"Language: {lang}\nPillar: {pillar.value}\nCreator: {source.creator_handle}\nTitle: {clean_title}\n"
                 f"Summary: {clean_summary}\nVerified facts: {clean_facts}\n"
                 f"Duration seconds: {duration:.1f}\nSpoiler warning needed: {spoiler_required}"
             ),
         )
         if llm_data:
-            cand_hook = sanitize_untrusted_video_text(str(llm_data.get("hook_on_screen", "")), max_length=64)
+            cand_hook = sanitize_untrusted_video_text(str(llm_data.get("hook_on_screen", "")), max_length=72)
             cand_vo = sanitize_untrusted_video_text(str(llm_data.get("voiceover_script", "")), max_length=600)
             cand_ov = sanitize_untrusted_video_text(str(llm_data.get("commentary_overlay", "")), max_length=110)
             if is_campaign:
-                cand_hook = _clean_campaign_text(cand_hook, 60)
+                cand_hook = _clean_campaign_text(cand_hook, 64)
                 cand_vo = _clean_campaign_text(cand_vo, 500)
                 cand_ov = _clean_campaign_text(cand_ov, 100)
             if cand_hook and cand_vo and not self._contains_unsafe_phrasing(
@@ -561,22 +581,11 @@ class ScriptCopyAgent:
         """Build strict Rule #10 Real Oficial KY4DWumZffg copies for Instagram Reels & TikTok ONLY."""
         base_hook = _clean_campaign_text(llm_hook or plan.hook_on_screen, 72)
         if not base_hook:
-            base_hook = _clean_campaign_text(plan.source.title, 72) or "Momento épico ao vivo no GTA VI!"
+            base_hook = _clean_campaign_text(plan.source.title, 72) or "olha essa cena ao vivo no gta vi kkkkkkk"
 
-        detail_source = (
-            plan.source.verified_facts[0]
-            if plan.source.verified_facts
-            else (plan.source.summary or plan.source.title)
-        )
-        detail_clean = _clean_campaign_text(detail_source, 72)
-        if detail_clean and detail_clean.lower() not in base_hook.lower():
-            positive_live_hook = _truncate_clean(f"{base_hook} — {detail_clean}", 140)
-        else:
-            positive_live_hook = base_hook
-
-        positive_live_hook = positive_live_hook.rstrip(" -—:,;")
+        positive_live_hook = base_hook.rstrip(" -—:,;")
         campaign_caption = (
-            f"{positive_live_hook} {MANDATORY_CAPTION_PHRASE} {MANDATORY_ONLY_HASHTAG}"
+            f"{positive_live_hook}\n\n{MANDATORY_CAPTION_PHRASE} {MANDATORY_ONLY_HASHTAG}"
         )
         campaign_title = _truncate_clean(positive_live_hook, 70)
 
@@ -670,8 +679,8 @@ class ScriptCopyAgent:
 
         # 3. TikTok: Short punchy caption + 3-4 hashtags + 🎥 @creator
         if is_pt:
-            tiktok_tags = ["#GTA6", "#GTAVI", "#GTA6Brasil", "#Games"]
-            tiktok_punch = f"{reels_hook} — { _truncate_clean(fact_one, 90) }"
+            tiktok_tags = ["#GTA6", "#GTAVI", "#GTA6Brasil", "#Cortes"]
+            tiktok_punch = reels_hook
         else:
             tiktok_tags = ["#GTA6", "#GTAVI", "#Leonida", "#Gaming"]
             tiktok_punch = f"{reels_hook} — { _truncate_clean(fact_one, 90) }"
@@ -760,9 +769,10 @@ class ScriptCopyAgent:
             llm_hook = ""
             llm_camp = await self._call_llm_json(
                 system_prompt=(
-                    "Você cria um gancho curto e super positivo em PT-BR (máx 90 caracteres) sobre um corte "
-                    "da Live Oficial YouTube x GTA VI. PROIBIDO usar hashtags (#), arrobas (@), logos, "
-                    "comparações com GTA V/San Andreas/'antes do GTA 6' ou críticas. "
+                    "Você cria uma frase super solta, minúscula, espontânea e positiva em PT-BR (máx 70 caracteres) "
+                    "para a legenda de um corte da Live Oficial YouTube x GTA VI — estilo página grande de cortes "
+                    "(ex: 'o skorpion até animou kkkkkkkkkkkkkkkkk', 'a cara dele vendo isso ao vivo kkkkkkkk'). "
+                    "PROIBIDO usar hashtags (#), arrobas (@), logos, comparações com GTA V/San Andreas/'antes do GTA 6' ou críticas. "
                     "Retorne JSON: {\"positive_live_hook\": \"...\"}"
                 ),
                 user_prompt=(
