@@ -55,6 +55,10 @@ BANNED_CAMPAIGN_RE = re.compile(r"\b(gta\s*5|gta\s*v|ps3|xbox\s*360|negativ|hype
 STREAMER_NICKNAMES_BR: dict[str, str] = {
     "loud_coringa": "coringa",
     "coringa": "coringa",
+    "gabepeixe": "gabe",
+    "gabe": "gabe",
+    "jonvlogs": "jon",
+    "jon": "jon",
     "alanzoka": "alanzoka",
     "skorpionoficial": "skorpion",
     "skorpion": "skorpion",
@@ -65,8 +69,16 @@ STREAMER_NICKNAMES_BR: dict[str, str] = {
     "funkyblackcat": "funky",
     "gaules": "gaules",
     "luquet4": "luquet4",
+    "yoda": "yoda",
+    "loud_bak": "bak",
+    "bak": "bak",
+    "nobru": "nobru",
+    "xarola": "xarola",
+    "facada": "facada",
+    "cellbit": "cellbit",
     "brksedu": "edu",
     "gameplayrj": "davy",
+    "davyjones": "davy",
     "youtube": "",
     "rockstargames": "",
 }
@@ -84,6 +96,9 @@ def friendly_streamer_name(handle_or_name: str, fallback_text: str = "") -> str:
     probe = f"{raw} {fallback_text}".lower()
     for alias, nick in (
         ("coringa", "coringa"),
+        ("gabepeixe", "gabe"),
+        ("jon vlogs", "jon"),
+        ("jonvlogs", "jon"),
         ("alanzoka", "alanzoka"),
         ("skorpion", "skorpion"),
         ("gamer costa", "gamer costa"),
@@ -91,6 +106,11 @@ def friendly_streamer_name(handle_or_name: str, fallback_text: str = "") -> str:
         ("funky", "funky"),
         ("gaules", "gaules"),
         ("luquet4", "luquet4"),
+        ("yoda", "yoda"),
+        ("loud bak", "bak"),
+        ("nobru", "nobru"),
+        ("xarola", "xarola"),
+        ("facada", "facada"),
         ("brksedu", "edu"),
     ):
         if alias in probe:

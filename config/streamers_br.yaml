@@ -45,27 +45,30 @@ capture_settings:
 
 
 streamers_br:
-  - handle: "@SkorpionOFICIAL"
-    name: "Skorpion Gamer"
+  - handle: "@loud_coringa"
+    name: "LOUD Coringa"
     priority: 100
-    youtube_live_url: "https://www.youtube.com/@SkorpionOFICIAL/live"
-    youtube_streams_url: "https://www.youtube.com/@SkorpionOFICIAL/streams"
-    youtube_videos_url: "https://www.youtube.com/@SkorpionOFICIAL/videos"
-    twitch_live_url: ""
-    twitch_vods_url: ""
+    kick_live_url: "https://kick.com/coringa"
+    youtube_live_url: "https://www.youtube.com/@coringa/live"
+    youtube_streams_url: "https://www.youtube.com/@coringa/streams"
+    youtube_videos_url: "https://www.youtube.com/@coringa/videos"
+    twitch_live_url: "https://www.twitch.tv/coringa"
+    twitch_vods_url: "https://www.twitch.tv/coringa/videos?filter=archives&sort=time"
 
-  - handle: "@GamerCosta"
-    name: "Gamer Costa"
-    priority: 98
-    youtube_live_url: "https://www.youtube.com/@GamerCosta/live"
-    youtube_streams_url: "https://www.youtube.com/@GamerCosta/streams"
-    youtube_videos_url: "https://www.youtube.com/@GamerCosta/videos"
-    twitch_live_url: ""
-    twitch_vods_url: ""
+  - handle: "@gabepeixe"
+    name: "Gabepeixe"
+    priority: 99
+    kick_live_url: "https://kick.com/gabepeixe"
+    youtube_live_url: "https://www.youtube.com/@gabepeixe/live"
+    youtube_streams_url: "https://www.youtube.com/@gabepeixe/streams"
+    youtube_videos_url: "https://www.youtube.com/@gabepeixe/videos"
+    twitch_live_url: "https://www.twitch.tv/gabepeixe"
+    twitch_vods_url: "https://www.twitch.tv/gabepeixe/videos?filter=archives&sort=time"
 
   - handle: "@PaulinhoLOKOoficial"
     name: "Paulinho o Loko"
-    priority: 97
+    priority: 98
+    kick_live_url: "https://kick.com/paulinholokobr"
     youtube_live_url: "https://www.youtube.com/@PaulinhoLOKOoficial/live"
     youtube_streams_url: "https://www.youtube.com/@PaulinhoLOKOoficial/streams"
     youtube_videos_url: "https://www.youtube.com/@PaulinhoLOKOoficial/videos"
@@ -74,64 +77,125 @@ streamers_br:
 
   - handle: "@alanzoka"
     name: "Alanzoka"
-    priority: 96
+    priority: 97
     youtube_live_url: "https://www.youtube.com/@alanzoka/live"
     youtube_streams_url: "https://www.youtube.com/@alanzoka/streams"
     youtube_videos_url: "https://www.youtube.com/@alanzoka/videos"
     twitch_live_url: "https://www.twitch.tv/alanzoka"
     twitch_vods_url: "https://www.twitch.tv/alanzoka/videos?filter=archives&sort=time"
 
-  - handle: "@loud_coringa"
-    name: "LOUD Coringa"
-    priority: 95
-    kick_live_url: "https://kick.com/coringa"
-    youtube_live_url: "https://www.youtube.com/@coringa/live"
-    youtube_streams_url: "https://www.youtube.com/@coringa/streams"
-    youtube_videos_url: "https://www.youtube.com/@coringa/videos"
-    twitch_live_url: "https://www.twitch.tv/coringa"
-    twitch_vods_url: "https://www.twitch.tv/coringa/videos?filter=archives&sort=time"
-
-  - handle: "@funkyblackcat"
-    name: "FunkyBlackCat"
-    priority: 93
-    youtube_live_url: "https://www.youtube.com/@funkyblackcat/live"
-    youtube_streams_url: "https://www.youtube.com/@funkyblackcat/streams"
-    youtube_videos_url: "https://www.youtube.com/@funkyblackcat/videos"
-    twitch_live_url: "https://www.twitch.tv/funkyblackcat"
-    twitch_vods_url: "https://www.twitch.tv/funkyblackcat/videos?filter=archives&sort=time"
-
-  - handle: "@gaules"
-    name: "Gaules"
-    priority: 91
-    youtube_live_url: "https://www.youtube.com/@gaules/live"
-    youtube_streams_url: "https://www.youtube.com/@gaules/streams"
-    youtube_videos_url: ""
-    twitch_live_url: "https://www.twitch.tv/gaules"
-    twitch_vods_url: "https://www.twitch.tv/gaules/videos?filter=archives&sort=time"
+  - handle: "@jonvlogs"
+    name: "Jon Vlogs"
+    priority: 96
+    kick_live_url: "https://kick.com/jonvlogs"
+    youtube_live_url: "https://www.youtube.com/@JonVlogs/live"
+    youtube_streams_url: "https://www.youtube.com/@JonVlogs/streams"
+    youtube_videos_url: "https://www.youtube.com/@JonVlogs/videos"
+    twitch_live_url: ""
+    twitch_vods_url: ""
 
   - handle: "@luquet4"
     name: "Luquet4"
-    priority: 90
+    priority: 95
+    kick_live_url: "https://kick.com/luquet4"
     youtube_live_url: "https://www.youtube.com/@luquet4/live"
     youtube_streams_url: "https://www.youtube.com/@luquet4/streams"
     youtube_videos_url: ""
     twitch_live_url: "https://www.twitch.tv/luquet4"
     twitch_vods_url: "https://www.twitch.tv/luquet4/videos?filter=archives&sort=time"
 
-  - handle: "@BRKsEDU"
-    name: "BRKsEDU"
-    priority: 89
-    youtube_live_url: "https://www.youtube.com/@BRKsEDU/live"
-    youtube_streams_url: "https://www.youtube.com/@BRKsEDU/streams"
-    youtube_videos_url: "https://www.youtube.com/@BRKsEDU/videos"
-    twitch_live_url: "https://www.twitch.tv/brksedu"
+  - handle: "@gaules"
+    name: "Gaules"
+    priority: 94
+    kick_live_url: "https://kick.com/gaules"
+    youtube_live_url: "https://www.youtube.com/@gaules/live"
+    youtube_streams_url: "https://www.youtube.com/@gaules/streams"
+    youtube_videos_url: ""
+    twitch_live_url: "https://www.twitch.tv/gaules"
+    twitch_vods_url: "https://www.twitch.tv/gaules/videos?filter=archives&sort=time"
+
+  - handle: "@SkorpionOFICIAL"
+    name: "Skorpion Gamer"
+    priority: 93
+    youtube_live_url: "https://www.youtube.com/@SkorpionOFICIAL/live"
+    youtube_streams_url: "https://www.youtube.com/@SkorpionOFICIAL/streams"
+    youtube_videos_url: "https://www.youtube.com/@SkorpionOFICIAL/videos"
+    twitch_live_url: ""
     twitch_vods_url: ""
+
+  - handle: "@GamerCosta"
+    name: "Gamer Costa"
+    priority: 92
+    youtube_live_url: "https://www.youtube.com/@GamerCosta/live"
+    youtube_streams_url: "https://www.youtube.com/@GamerCosta/streams"
+    youtube_videos_url: "https://www.youtube.com/@GamerCosta/videos"
+    twitch_live_url: ""
+    twitch_vods_url: ""
+
+  - handle: "@yoda"
+    name: "YoDa"
+    priority: 91
+    kick_live_url: "https://kick.com/yoda"
+    youtube_live_url: ""
+    youtube_streams_url: ""
+    youtube_videos_url: ""
+    twitch_live_url: "https://www.twitch.tv/yoda"
+    twitch_vods_url: "https://www.twitch.tv/yoda/videos?filter=archives&sort=time"
+
+  - handle: "@loud_bak"
+    name: "LOUD Bak"
+    priority: 90
+    kick_live_url: "https://kick.com/bak"
+    youtube_live_url: "https://www.youtube.com/@LOUDBak/live"
+    youtube_streams_url: "https://www.youtube.com/@LOUDBak/streams"
+    youtube_videos_url: ""
+    twitch_live_url: ""
+    twitch_vods_url: ""
+
+  - handle: "@nobru"
+    name: "Nobru"
+    priority: 89
+    kick_live_url: "https://kick.com/nobru"
+    youtube_live_url: "https://www.youtube.com/@Nobru/live"
+    youtube_streams_url: "https://www.youtube.com/@Nobru/streams"
+    youtube_videos_url: ""
+    twitch_live_url: ""
+    twitch_vods_url: ""
+
+  - handle: "@funkyblackcat"
+    name: "FunkyBlackCat"
+    priority: 88
+    youtube_live_url: "https://www.youtube.com/@funkyblackcat/live"
+    youtube_streams_url: "https://www.youtube.com/@funkyblackcat/streams"
+    youtube_videos_url: "https://www.youtube.com/@funkyblackcat/videos"
+    twitch_live_url: "https://www.twitch.tv/funkyblackcat"
+    twitch_vods_url: "https://www.twitch.tv/funkyblackcat/videos?filter=archives&sort=time"
+
+  - handle: "@xarola"
+    name: "Xarola"
+    priority: 87
+    kick_live_url: "https://kick.com/xarola"
+    youtube_live_url: ""
+    youtube_streams_url: ""
+    youtube_videos_url: ""
+    twitch_live_url: "https://www.twitch.tv/xarola"
+    twitch_vods_url: "https://www.twitch.tv/xarola/videos?filter=archives&sort=time"
 
   - handle: "@Gameplayrj"
     name: "Davy Jones (Gameplayrj)"
-    priority: 88
+    priority: 86
+    kick_live_url: "https://kick.com/davyjones"
     youtube_live_url: "https://www.youtube.com/@Gameplayrj/live"
     youtube_streams_url: "https://www.youtube.com/@Gameplayrj/streams"
     youtube_videos_url: "https://www.youtube.com/@Gameplayrj/videos"
     twitch_live_url: ""
     twitch_vods_url: ""
+
+  - handle: "@BRKsEDU"
+    name: "BRKsEDU"
+    priority: 85
+    youtube_live_url: "https://www.youtube.com/@BRKsEDU/live"
+    youtube_streams_url: "https://www.youtube.com/@BRKsEDU/streams"
+    youtube_videos_url: "https://www.youtube.com/@BRKsEDU/videos"
+    twitch_live_url: "https://www.twitch.tv/brksedu"
+    twitch_vods_url: "https://www.twitch.tv/brksedu/videos?filter=archives&sort=time"

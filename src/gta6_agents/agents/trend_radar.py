@@ -77,10 +77,12 @@ async def discover_twitch_live_gql(
                       title
                       viewersCount
                       createdAt
-                      broadcasterLanguage
                       broadcaster {{
                         login
                         displayName
+                        broadcastSettings {{
+                          language
+                        }}
                       }}
                     }}
                   }}
@@ -90,17 +92,58 @@ async def discover_twitch_live_gql(
             """
         )
 
-    client = http_client or httpx.AsyncClient(timeout=timeout_sec)
-    owns_client = http_client is None
+    client: httpx.AsyncClient | None = http_client
+    owns_client = False
+    if client is None:
+        try:
+            client = httpx.AsyncClient(timeout=timeout_sec)
+            owns_client = True
+        except Exception:
+            client = None
     all_hits: dict[str, LiveStreamHit] = {}
+
+    async def _post_gql(q_str: str) -> dict[str, Any] | None:
+        if client is not None:
+            try:
+                resp = await client.post(endpoint, json={"query": q_str}, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if isinstance(data, dict):
+                        return data
+            except Exception as exc:
+                logger.debug("Twitch GQL httpx call failed, trying curl fallback: %s", exc)
+        # Reliable curl fallback (handles IPv6 NO_PROXY & system CA bundle)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "curl",
+                "-sS",
+                "--max-time",
+                str(int(timeout_sec)),
+                "-X",
+                "POST",
+                endpoint,
+                "-H",
+                f"Client-Id: {TWITCH_PUBLIC_GQL_CLIENT_ID}",
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                json.dumps({"query": q_str}),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec + 2.0)
+            if (proc.returncode or 0) == 0 and out_b.strip().startswith(b"{"):
+                parsed = json.loads(out_b.decode("utf-8", errors="replace"))
+                if isinstance(parsed, dict):
+                    return parsed
+        except Exception:
+            pass
+        return None
 
     try:
         for q_str in queries:
             try:
-                resp = await client.post(endpoint, json={"query": q_str}, headers=headers)
-                if resp.status_code != 200:
-                    continue
-                data = resp.json()
+                data = await _post_gql(q_str)
                 if not isinstance(data, dict):
                     continue
                 data_inner = data.get("data")
@@ -134,7 +177,13 @@ async def discover_twitch_live_gql(
                     display_name = str(broadcaster.get("displayName") or login)
                     title = str(node.get("title") or "")
                     viewers = int(node.get("viewersCount") or 0)
-                    lang = str(node.get("broadcasterLanguage") or "").lower()
+                    b_settings = broadcaster.get("broadcastSettings") or {}
+                    raw_lang = (
+                        node.get("broadcasterLanguage")
+                        or (b_settings.get("language") if isinstance(b_settings, dict) else "")
+                        or ""
+                    )
+                    lang = str(raw_lang).lower()
                     started_at = str(node.get("createdAt") or "")
 
                     if lang_pref and lang:
@@ -159,7 +208,7 @@ async def discover_twitch_live_gql(
             except Exception as exc:
                 logger.debug("Twitch GQL query failed for game query: %s", exc)
     finally:
-        if owns_client:
+        if owns_client and client is not None:
             await client.aclose()
 
     hits = list(all_hits.values())

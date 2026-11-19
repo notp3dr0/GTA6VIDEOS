@@ -413,6 +413,8 @@ class ScoutAgent:
         blocked_keywords: list[str],
         max_segments_per_video: int = 8,
     ) -> list[SourceCandidate]:
+        if not self.config.real_oficial_enabled:
+            return []
         raw_campaign = self.config.campaign
         campaign_block: dict[str, Any] = {}
         if isinstance(raw_campaign, dict) and raw_campaign:
@@ -1317,7 +1319,7 @@ class ScoutAgent:
         self,
         blacklist: set[str],
         blocked_keywords: list[str],
-        max_streamers: int = 10,
+        max_streamers: int = 16,
     ) -> list[SourceCandidate]:
         """Discover active GTA VI lives & newest VODs across all configured Brazilian streamers (Kick + YouTube + Twitch)."""
         capture_cfg, streamers = self._load_streamers_br_config()
@@ -1386,7 +1388,7 @@ class ScoutAgent:
         fresh_candidates = await self.discover_br_streamer_streams(
             blacklist=blacklist,
             blocked_keywords=blocked_keywords,
-            max_streamers=10,
+            max_streamers=16,
         )
 
         # Cache up to 40 newest unseen VOD/live slices on disk + SQLite flag for instant slot access
@@ -1657,6 +1659,62 @@ class ScoutAgent:
                         blocked_keywords,
                     )
                     _add_unique(br_streamer_candidates)
+                except Exception:
+                    pass
+
+            if not self.config.dry_run:
+                try:
+                    from datetime import datetime, timezone
+                    from gta6_agents.agents.trend_radar import discover_twitch_live_gql
+
+                    tw_hits = await discover_twitch_live_gql(
+                        game_names=["Grand Theft Auto VI", "GTA VI"],
+                        language_filter="pt",
+                        limit=12,
+                    )
+                    now_dt = datetime.now(timezone.utc)
+                    now_ts = now_dt.timestamp()
+                    live_bucket = now_dt.strftime("%Y%m%d%H%M")[:-1] + "0"
+                    for hit in tw_hits:
+                        handle = _ensure_at_handle(hit.channel_login)
+                        clean_t = sanitize_untrusted_video_text(hit.title or f"{hit.display_name} ao vivo no GTA VI", max_length=160)
+                        if self._is_blocked_content(handle, clean_t, clean_t, blacklist, blocked_keywords):
+                            continue
+                        seg_url = f"{hit.url}#live-{live_bucket}"
+                        if self.store.is_source_seen(seg_url):
+                            continue
+                        _add_unique(
+                            [
+                                SourceCandidate(
+                                    title=f"{hit.display_name} AO VIVO — {clean_t}"[:160],
+                                    url=seg_url,
+                                    creator_handle=handle,
+                                    source_type="twitch",
+                                    is_official=False,
+                                    is_campaign_acervo=False,
+                                    pillar=ContentPillar.GAMEPLAY_CLIPS,
+                                    summary=f"Live ao vivo na Twitch ({hit.viewers:,} espectadores) de {hit.display_name} jogando GTA VI em português.",
+                                    verified_facts=[
+                                        f"Transmissão ao vivo verificada na Twitch de {hit.display_name} ({handle}).",
+                                    ],
+                                    suggested_start_sec=0.0,
+                                    suggested_end_sec=float(capture_cfg.get("clip_duration_sec", 25.0)),
+                                    virality_score=min(99.0, 88.0 + min(10.0, hit.viewers / 8000.0)),
+                                    metadata={
+                                        "canonical_url": hit.url,
+                                        "is_live": True,
+                                        "streamer_br": True,
+                                        "streamer_name": hit.display_name,
+                                        "platform": "twitch",
+                                        "viewer_count": hit.viewers,
+                                        "published_ts": now_ts,
+                                        "upload_date": now_dt.strftime("%Y-%m-%d"),
+                                        "age_hours": 0.0,
+                                        "freshness_score": 99.0,
+                                    },
+                                )
+                            ]
+                        )
                 except Exception:
                     pass
 

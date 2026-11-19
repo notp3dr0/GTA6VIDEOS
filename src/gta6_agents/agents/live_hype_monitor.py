@@ -716,7 +716,7 @@ class LiveHypeMonitorAgent:
         live_cands = await scout.discover_br_streamer_streams(
             blacklist,
             blocked_kw,
-            max_streamers=10,
+            max_streamers=16,
         )
 
         targets: list[dict[str, Any]] = []
