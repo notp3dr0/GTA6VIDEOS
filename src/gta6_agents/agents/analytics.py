@@ -213,6 +213,15 @@ class AnalyticsLearningAgent:
         with learning_path.open("a", encoding="utf-8") as fh:
             fh.write(markdown_entry)
 
+        scoreboard_path = self._sync_scoreboard_csv(publications, now_local)
+        payouts_path = self._sync_payouts_csv(
+            entries=entries,
+            default_cpm=default_cpm,
+            min_views=min_views,
+            max_per_video=max_per_video,
+            now_local=now_local,
+        )
+
         summary: dict[str, Any] = {
             "timestamp": now_utc.isoformat(),
             "local_time": now_local.isoformat(),
@@ -237,5 +246,120 @@ class AnalyticsLearningAgent:
             "daily_credit_limit": self.config.real_oficial_daily_credit_limit,
             "recommendations": recommendations,
             "learning_log_path": str(learning_path),
+            "scoreboard_csv_path": str(scoreboard_path),
+            "payouts_csv_path": str(payouts_path),
         }
         return summary
+
+    def _sync_scoreboard_csv(
+        self,
+        publications: list[dict[str, Any]],
+        now_local: datetime,
+    ) -> Any:
+        """Persist 12h/24h/72h learning-loop scoreboard (`memory/scoreboard.csv`, ported from learning-loop skill)."""
+        import csv
+
+        path = self.config.memory_dir / "scoreboard.csv"
+        fieldnames = [
+            "post_id",
+            "date",
+            "time",
+            "platform",
+            "pillar",
+            "hook_preview",
+            "public_url",
+            "status",
+            "test_name",
+            "views_12h",
+            "views_24h",
+            "views_72h",
+            "notes",
+        ]
+        existing_ids: set[str] = set()
+        if path.exists():
+            try:
+                with path.open("r", encoding="utf-8", newline="") as fh:
+                    for row in csv.DictReader(fh):
+                        pid = (row.get("post_id") or "").strip()
+                        if pid:
+                            existing_ids.add(pid)
+            except Exception:
+                pass
+
+        write_header = not path.exists() or path.stat().st_size == 0
+        with path.open("a", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            if write_header:
+                writer.writeheader()
+            for pub in publications:
+                pid = str(pub.get("id") or "").strip()
+                if not pid or pid in existing_ids:
+                    continue
+                existing_ids.add(pid)
+                caption_first_line = str(pub.get("caption_text") or "").splitlines()[0][:80] if pub.get("caption_text") else ""
+                writer.writerow(
+                    {
+                        "post_id": pid,
+                        "date": now_local.strftime("%Y-%m-%d"),
+                        "time": now_local.strftime("%H:%M"),
+                        "platform": str(pub.get("platform") or ""),
+                        "pillar": self._infer_pillar_from_publication(pub),
+                        "hook_preview": caption_first_line,
+                        "public_url": str(pub.get("public_url") or ""),
+                        "status": str(pub.get("status") or ""),
+                        "test_name": "kinetic_react_v2",
+                        "views_12h": "",
+                        "views_24h": "",
+                        "views_72h": "",
+                        "notes": "Read after 24h/72h before changing rule",
+                    }
+                )
+        return path
+
+    def _sync_payouts_csv(
+        self,
+        *,
+        entries: list[dict[str, Any]],
+        default_cpm: float,
+        min_views: int,
+        max_per_video: float,
+        now_local: datetime,
+    ) -> Any:
+        """Write transparent campaign payout ledger (`memory/payouts.csv`, ported from scripts/payouts.py)."""
+        import csv
+
+        path = self.config.memory_dir / "payouts.csv"
+        fieldnames = [
+            "date",
+            "campaign",
+            "platform",
+            "post_url",
+            "views",
+            "rate_per_1k_brl",
+            "est_payout_brl",
+            "status",
+        ]
+        with path.open("w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            writer.writeheader()
+            for entry in entries:
+                views = int(entry.get("validated_views") or 0)
+                cpm = float(entry.get("estimated_cpm_brl") or default_cpm)
+                est = (
+                    round(min(max_per_video, (views / 1000.0) * cpm), 2)
+                    if views >= min_views
+                    else 0.0
+                )
+                writer.writerow(
+                    {
+                        "date": str(entry.get("submitted_at") or now_local.strftime("%Y-%m-%d"))[:10],
+                        "campaign": str(entry.get("campaign_slug") or self.config.real_oficial_campaign_slug),
+                        "platform": str(entry.get("platform") or "tiktok_or_reels"),
+                        "post_url": str(entry.get("public_url") or entry.get("youtube_url") or ""),
+                        "views": views,
+                        "rate_per_1k_brl": f"{cpm:.2f}",
+                        "est_payout_brl": f"{est:.2f}",
+                        "status": str(entry.get("status") or "pending_submission"),
+                    }
+                )
+        return path

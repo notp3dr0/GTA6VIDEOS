@@ -2,9 +2,57 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from gta6_agents.models import SubtitleCue
+
+
+SLURS_PATTERNS = [
+    r"\bnigg\w*\b",
+    r"\bfagg?\w*\b",
+    r"\bretard\w*\b",
+    r"\btranny\w*\b",
+    r"\bviad(?:o|inho|ão)\b",
+]
+
+SWEARS_PATTERNS = [
+    r"\bfuck(?:ing|ed|ers|er)?\b",
+    r"\bshit(?:ty|bag|s)?\b",
+    r"\bbitch(?:es)?\b",
+    r"\basshole\b",
+    r"\bcock\b",
+    r"\bpussy\b",
+    r"\bdick\b",
+    r"\bwhore\b",
+    r"\bslut\b",
+    r"\bcaralho\b",
+    r"\bporra\b",
+    r"\bfoda(?:-se)?\b",
+    r"\bputa(?:o|ria)?\b",
+    r"\bmerda\b",
+    r"\bcuz[aã]o\b",
+    r"\btnc\b",
+    r"\bpqp\b",
+]
+
+COMPILED_SLURS_RE = re.compile("|".join(SLURS_PATTERNS), re.IGNORECASE)
+COMPILED_PROFANITY_RE = re.compile("|".join(SWEARS_PATTERNS), re.IGNORECASE)
+
+
+def mask_profanity(text: str, allow_profanity: bool = False) -> str:
+    """Always mask slurs; also mask heavy EN & PT-BR swears unless allow_profanity=True."""
+    if not text:
+        return text
+
+    def _mask_match(match: re.Match[str]) -> str:
+        word = match.group(0)
+        if len(word) <= 1:
+            return "*"
+        return word[0] + "*" * (len(word) - 1)
+
+    cleaned = COMPILED_SLURS_RE.sub(_mask_match, text)
+    return cleaned if allow_profanity else COMPILED_PROFANITY_RE.sub(_mask_match, cleaned)
 
 
 def format_ass_timestamp(seconds: float) -> str:
@@ -29,13 +77,11 @@ def _escape_ass_text(text: str) -> str:
     return r"\N".join(lines)
 
 
-def _group_words_into_chunks(words: list[str], target_size: int = 4, max_size: int = 6) -> list[str]:
-    """Group words into punchy 3-6 word chunks suitable for mobile vertical viewing."""
+def _group_words_into_chunks(words: list[str], target_size: int = 3, max_size: int = 4) -> list[str]:
+    """Group words into punchy 2-3 word phrases suitable for mobile vertical viewing."""
     if not words:
         return []
     if len(words) <= max_size:
-        if len(words) == 6:
-            return [" ".join(words[:3]), " ".join(words[3:])]
         return [" ".join(words)]
 
     chunks: list[list[str]] = []
@@ -44,13 +90,7 @@ def _group_words_into_chunks(words: list[str], target_size: int = 4, max_size: i
     while idx < total:
         rem = total - idx
         if rem <= max_size:
-            if rem <= 2 and chunks and len(chunks[-1]) + rem <= max_size:
-                chunks[-1].extend(words[idx:])
-            elif rem == 6:
-                chunks.append(words[idx : idx + 3])
-                chunks.append(words[idx + 3 : idx + 6])
-            else:
-                chunks.append(words[idx:])
+            chunks.append(words[idx:])
             break
         chunks.append(words[idx : idx + target_size])
         idx += target_size
@@ -59,20 +99,19 @@ def _group_words_into_chunks(words: list[str], target_size: int = 4, max_size: i
 
 
 def cues_from_script(script_text: str, total_duration_sec: float) -> list[SubtitleCue]:
-    """Split a narration or commentary script into timed 3-6 word SubtitleCue chunks."""
+    """Split a narration or commentary script into timed 2-3 word SubtitleCue chunks."""
     cleaned = " ".join((script_text or "").split())
     if not cleaned:
         return []
 
     duration = max(1.0, float(total_duration_sec))
     words = cleaned.split()
-    chunk_texts = _group_words_into_chunks(words, target_size=4, max_size=6)
+    chunk_texts = _group_words_into_chunks(words, target_size=3, max_size=4)
     if not chunk_texts:
         return []
 
-    # Leave a small tail buffer so the final caption finishes cleanly right as the clip ends.
     usable_duration = max(0.6, duration - 0.15) if duration > 1.5 else duration
-    weights = [max(3, len(chunk)) for chunk in chunk_texts]
+    weights = [max(2, len(chunk)) for chunk in chunk_texts]
     total_weight = sum(weights)
 
     cues: list[SubtitleCue] = []
@@ -82,9 +121,9 @@ def cues_from_script(script_text: str, total_duration_sec: float) -> list[Subtit
             end_t = usable_duration
         else:
             share = usable_duration * (weight / total_weight)
-            end_t = min(usable_duration - 0.05 * (len(chunk_texts) - 1 - idx), cursor + max(0.25, share))
+            end_t = min(usable_duration - 0.05 * (len(chunk_texts) - 1 - idx), cursor + max(0.2, share))
         if end_t <= cursor:
-            end_t = min(duration, cursor + 0.25)
+            end_t = min(duration, cursor + 0.2)
         cues.append(
             SubtitleCue(
                 start_sec=round(cursor, 2),
@@ -98,12 +137,11 @@ def cues_from_script(script_text: str, total_duration_sec: float) -> list[Subtit
 
 
 def _normalize_and_chunk_cues(cues: list[SubtitleCue], total_duration_sec: float) -> list[SubtitleCue]:
-    """Ensure cues fit [0, total_duration_sec] and split long cues into 3-5 word dynamic chunks."""
+    """Ensure cues fit [0, total_duration_sec] and split long cues into 2-3 word dynamic chunks."""
     if not cues:
         return []
 
     duration = max(1.0, float(total_duration_sec))
-    # If caller passed unshifted timestamps (all >= duration), shift relative to the earliest cue.
     min_start = min(c.start_sec for c in cues)
     offset = min_start if min_start >= duration else 0.0
 
@@ -118,15 +156,15 @@ def _normalize_and_chunk_cues(cues: list[SubtitleCue], total_duration_sec: float
             continue
         if end <= start:
             end = min(duration, start + 1.2)
-        if end - start < 0.12:
+        if end - start < 0.1:
             continue
 
         words = raw_text.split()
-        if len(words) <= 5:
+        if len(words) <= 4:
             normalized.append(SubtitleCue(start_sec=round(start, 2), end_sec=round(end, 2), text=raw_text))
             continue
 
-        sub_chunks = _group_words_into_chunks(words, target_size=4, max_size=5)
+        sub_chunks = _group_words_into_chunks(words, target_size=3, max_size=4)
         span = end - start
         total_chars = max(1, sum(len(s) for s in sub_chunks))
         sub_cursor = start
@@ -134,7 +172,7 @@ def _normalize_and_chunk_cues(cues: list[SubtitleCue], total_duration_sec: float
             if idx == len(sub_chunks) - 1:
                 sub_end = end
             else:
-                sub_end = min(end - 0.04, sub_cursor + max(0.15, span * (len(sub_text) / total_chars)))
+                sub_end = min(end - 0.03, sub_cursor + max(0.15, span * (len(sub_text) / total_chars)))
             if sub_end > sub_cursor:
                 normalized.append(
                     SubtitleCue(
@@ -155,17 +193,27 @@ def build_ass_subtitles(
     output_ass_path: Path,
     hook_duration_sec: float = 2.5,
     total_duration_sec: float = 15.0,
+    *,
+    accent_ass_bgr: str = "&H0000EAFF",
+    style_mode: str = "kinetic_word",
+    layout_mode: str = "blur_pad_hud",
+    reaction_title: str = "",
+    allow_profanity: bool = False,
 ) -> Path:
-    """Generate a 1080x1920 .ass file with HookBanner, CaptionCenter, and CreditTag styles."""
+    """Generate a 1080x1920 .ass file with advanced kinetic word highlights, profanity masking, and custom layouts."""
     output_ass_path.parent.mkdir(parents=True, exist_ok=True)
     clip_dur = max(1.0, float(total_duration_sec))
     hook_dur = max(0.5, min(float(hook_duration_sec), clip_dur))
 
-    # ASS colors use &HAABBGGRR (00 = fully opaque, FF = fully transparent):
-    # - &H0000EAFF -> Vibrant Yellow (#FFEA00) for top hook
-    # - &H00FFFFFF -> Crisp White (#FFFFFF) for center captions
-    # - &H18FFFFFF -> Subtle high-legibility white for creator attribution
-    # - &H28000000 -> Dark semi-opaque banner fill for HookBanner (BorderStyle=3)
+    # Layout-based vertical margin for CaptionCenter
+    margin_v_map = {
+        "react": 360,
+        "facecam": 800,
+        "blur_pad_hud": 460,
+        "smart_crop": 540,
+    }
+    caption_margin_v = margin_v_map.get(layout_mode, 480)
+
     header = "\n".join(
         [
             "[Script Info]",
@@ -189,12 +237,20 @@ def build_ass_subtitles(
                 "&H28000000,&H80000000,-1,0,0,0,100,100,0,0,3,14,0,8,70,70,240,1"
             ),
             (
-                "Style: CaptionCenter,DejaVu Sans,62,&H00FFFFFF,&H0000EAFF,"
-                "&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,70,70,480,1"
+                f"Style: CaptionCenter,DejaVu Sans,62,&H00FFFFFF,{accent_ass_bgr},"
+                f"&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,70,70,{caption_margin_v},1"
             ),
             (
                 "Style: CreditTag,DejaVu Sans,34,&H18FFFFFF,&H00FFFFFF,"
                 "&H40000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,1,60,60,380,1"
+            ),
+            (
+                "Style: TitleBox,DejaVu Sans,48,&H0000EAFF,&H00FFFFFF,"
+                "&H28000000,&H80000000,-1,0,0,0,100,100,0,0,3,10,0,8,70,70,140,1"
+            ),
+            (
+                "Style: TitleOut,DejaVu Sans,44,&H00FFFFFF,&H0000EAFF,"
+                "&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,70,70,140,1"
             ),
             "",
             "[Events]",
@@ -204,29 +260,75 @@ def build_ass_subtitles(
 
     events: list[str] = []
 
-    escaped_credit = _escape_ass_text(credit_text)
+    # Credit Tag
+    masked_credit = mask_profanity(credit_text, allow_profanity)
+    escaped_credit = _escape_ass_text(masked_credit)
     if escaped_credit:
         events.append(
             f"Dialogue: 1,{format_ass_timestamp(0.0)},{format_ass_timestamp(clip_dur)},"
             f"CreditTag,,0,0,0,,{escaped_credit}"
         )
 
-    escaped_hook = _escape_ass_text(hook_text)
+    # Reaction TitleBox / TitleOut
+    if reaction_title:
+        masked_rt = mask_profanity(reaction_title, allow_profanity)
+        escaped_rt = _escape_ass_text(masked_rt)
+        if escaped_rt:
+            events.append(
+                f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(min(clip_dur, 4.0))},"
+                f"TitleBox,,0,0,0,,{escaped_rt}"
+            )
+
+    # Hook Banner with animation
+    masked_hook = mask_profanity(hook_text, allow_profanity)
+    escaped_hook = _escape_ass_text(masked_hook)
     if escaped_hook:
+        animated_hook_text = r"{\fad(0,180)\fscx92\fscy92\t(0,120,\fscx100\fscy100)}" + escaped_hook
         events.append(
             f"Dialogue: 3,{format_ass_timestamp(0.0)},{format_ass_timestamp(hook_dur)},"
-            f"HookBanner,,0,0,0,,{escaped_hook}"
+            f"HookBanner,,0,0,0,,{animated_hook_text}"
         )
 
     prepared_cues = _normalize_and_chunk_cues(cues, total_duration_sec=clip_dur)
     for cue in prepared_cues:
-        escaped_cue = _escape_ass_text(cue.text)
-        if not escaped_cue:
+        masked_cue_text = mask_profanity(cue.text, allow_profanity)
+        words = masked_cue_text.split()
+        if not words:
             continue
-        events.append(
-            f"Dialogue: 2,{format_ass_timestamp(cue.start_sec)},{format_ass_timestamp(cue.end_sec)},"
-            f"CaptionCenter,,0,0,0,,{escaped_cue}"
-        )
+
+        if style_mode == "kinetic_word" and len(words) > 1:
+            # Interpolate per-word start/end timestamps cleanly with zero overlap flicker
+            cue_dur = max(0.2, cue.end_sec - cue.start_sec)
+            word_dur = cue_dur / len(words)
+            norm_accent = accent_ass_bgr.rstrip("&")
+            for i, _target_word in enumerate(words):
+                w_start = cue.start_sec + i * word_dur
+                w_end = cue.end_sec if i == len(words) - 1 else (cue.start_sec + (i + 1) * word_dur)
+                if w_end <= w_start:
+                    continue
+
+                # Highlight active spoken word and add pop animation on first word of group
+                highlighted_parts = []
+                for j, w in enumerate(words):
+                    clean_w = _escape_ass_text(w.upper())
+                    if j == i:
+                        prefix = r"{\fscx112\fscy112\t(0,90,\fscx100\fscy100)}" if i == 0 else ""
+                        highlighted_parts.append(f"{prefix}{{\\c{norm_accent}&}}{clean_w}{{\\c&H00FFFFFF&}}")
+                    else:
+                        highlighted_parts.append(clean_w)
+
+                line_text = " ".join(highlighted_parts)
+                events.append(
+                    f"Dialogue: 2,{format_ass_timestamp(w_start)},{format_ass_timestamp(w_end)},"
+                    f"CaptionCenter,,0,0,0,,{line_text}"
+                )
+        else:
+            escaped_cue = _escape_ass_text(masked_cue_text)
+            if escaped_cue:
+                events.append(
+                    f"Dialogue: 2,{format_ass_timestamp(cue.start_sec)},{format_ass_timestamp(cue.end_sec)},"
+                    f"CaptionCenter,,0,0,0,,{escaped_cue}"
+                )
 
     ass_content = header + "\n" + "\n".join(events) + "\n"
     output_ass_path.write_text(ass_content, encoding="utf-8")

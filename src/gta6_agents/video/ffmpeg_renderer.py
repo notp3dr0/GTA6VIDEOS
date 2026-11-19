@@ -93,6 +93,10 @@ def _extract_thumbnail(video_path: Path, thumbnail_path: Path, timestamp_sec: fl
     return None
 
 
+def _even(value: float) -> int:
+    return max(2, int(value) // 2 * 2)
+
+
 def render_vertical_short(
     source_video: Path,
     output_video: Path,
@@ -103,8 +107,15 @@ def render_vertical_short(
     layout_mode: str = "blur_pad_hud",
     crf: int = 20,
     loudnorm_lufs: float = -14.0,
+    *,
+    cam_box: tuple[float, float, float, float] | None = None,
+    cam_side: str = "right",
+    game_crop_x: int | None = None,
+    hook_voiceover_only: bool = False,
+    hook_vo_seconds: float = 2.5,
+    seam_band_height: int = 0,
 ) -> dict[str, Any]:
-    """Render a 1080x1920 30fps Short/Reel with HUD blur-pad or smart crop, ASS overlays, and -14 LUFS audio."""
+    """Render a 1080x1920 30fps Short/Reel (blur_pad_hud | smart_crop | react | facecam), ASS overlays, and -14 LUFS audio."""
     if not source_video.exists():
         raise FileNotFoundError(f"Source video does not exist: {source_video}")
 
@@ -113,6 +124,8 @@ def render_vertical_short(
     probe_in = _probe_media(source_video)
     source_has_audio = bool(probe_in["has_audio"])
     source_dur = float(probe_in["duration"] or 0.0)
+    src_w = int(probe_in["width"] or 1920)
+    src_h = int(probe_in["height"] or 1080)
 
     seek_start = max(0.0, float(start_sec))
     requested_dur = max(1.0, float(duration_sec))
@@ -121,18 +134,83 @@ def render_vertical_short(
     else:
         target_dur = requested_dur
 
+    vo_probe = _probe_media(voiceover_audio) if (voiceover_audio and voiceover_audio.exists()) else {}
     has_vo = (
         voiceover_audio is not None
         and voiceover_audio.exists()
         and voiceover_audio.stat().st_size > 0
-        and _probe_media(voiceover_audio)["has_audio"]
+        and bool(vo_probe.get("has_audio", False))
     )
+    vo_dur = float(vo_probe.get("duration") or 0.0) if has_vo else 0.0
 
     filter_parts: list[str] = []
 
     # 1. Video layout pipeline (1080x1920 @ 30fps, yuv420p)
     mode = (layout_mode or "blur_pad_hud").strip().lower()
-    if mode == "smart_crop":
+    if mode in ("react", "facecam") and cam_box is None:
+        # Safe fallback when no webcam was detected
+        mode = "blur_pad_hud"
+
+    if mode == "react" and cam_box is not None:
+        # Streamer React Split-Screen (ported from gtavi-claudecode): 730px cam top + 1190px gameplay bottom
+        top_h = 730
+        game_h = 1920 - top_h  # 1190
+        cx, cy, cw_f, ch_f = cam_box
+        crop_w = min(src_w, _even(max(64.0, src_w * cw_f)))
+        crop_h = min(src_h, _even(max(64.0, src_h * ch_f)))
+        crop_x = min(max(0, _even(src_w * cx)), max(0, src_w - crop_w))
+        crop_y = min(max(0, _even(src_h * cy)), max(0, src_h - crop_h))
+
+        scaled_gw = _even(src_w * game_h / max(1, src_h))
+        if scaled_gw < 1080:
+            scaled_gw = 1080
+        max_gx = max(0, scaled_gw - 1080)
+        if game_crop_x is not None:
+            gx = min(max(0, _even(game_crop_x)), max_gx)
+        else:
+            gx = max_gx if cam_side == "left" else 0
+
+        filter_parts.append("[0:v]split=2[vcam_in][vgame_in]")
+        filter_parts.append(
+            f"[vcam_in]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},"
+            f"scale=1080:{top_h}:force_original_aspect_ratio=increase,"
+            f"crop=1080:{top_h},setsar=1[vcam]"
+        )
+        filter_parts.append(
+            f"[vgame_in]scale={scaled_gw}:{game_h}:force_original_aspect_ratio=increase,"
+            f"crop=1080:{game_h}:{gx}:0,setsar=1[vgame]"
+        )
+        if seam_band_height > 0:
+            band_y = max(0, top_h - seam_band_height // 2)
+            filter_parts.append(
+                f"[vcam][vgame]vstack,"
+                f"drawbox=x=0:y={band_y}:w=iw:h={int(seam_band_height)}:color=white@0.95:t=fill,"
+                f"setsar=1,fps=30,format=yuv420p[vbase]"
+            )
+        else:
+            filter_parts.append("[vcam][vgame]vstack,setsar=1,fps=30,format=yuv420p[vbase]")
+    elif mode == "facecam" and cam_box is not None:
+        # Classic 38% webcam top + 62% full-height cropped gameplay bottom
+        top_h = _even(1920 * 0.38)  # 728
+        game_h = 1920 - top_h  # 1192
+        cx, cy, cw_f, ch_f = cam_box
+        crop_w = min(src_w, _even(max(64.0, src_w * cw_f)))
+        crop_h = min(src_h, _even(max(64.0, src_h * ch_f)))
+        crop_x = min(max(0, _even(src_w * cx)), max(0, src_w - crop_w))
+        crop_y = min(max(0, _even(src_h * cy)), max(0, src_h - crop_h))
+
+        filter_parts.append("[0:v]split=2[vcam_in][vgame_in]")
+        filter_parts.append(
+            f"[vcam_in]crop={crop_w}:{crop_h}:{crop_x}:{crop_y},"
+            f"scale=1080:{top_h}:force_original_aspect_ratio=increase,"
+            f"crop=1080:{top_h},setsar=1[vcam]"
+        )
+        filter_parts.append(
+            f"[vgame_in]scale=1080:{game_h}:force_original_aspect_ratio=increase,"
+            f"crop=1080:{game_h},setsar=1[vgame]"
+        )
+        filter_parts.append("[vcam][vgame]vstack,setsar=1,fps=30,format=yuv420p[vbase]")
+    elif mode == "smart_crop":
         # Center 9:16 crop (`scale=-2:1920,crop=1080:1920` generalized for any input aspect ratio)
         filter_parts.append(
             "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
@@ -161,7 +239,29 @@ def render_vertical_short(
 
     # 3. Audio ducking, mixing, and EBU R128 loudness normalization (-14 LUFS, -1.5 dBTP, LRA 11)
     loudnorm_expr = f"loudnorm=I={float(loudnorm_lufs):.1f}:TP=-1.5:LRA=11"
-    if source_has_audio and has_vo:
+    if source_has_audio and has_vo and hook_voiceover_only:
+        # Ported from translate.py: duck game/streamer audio ONLY for the 2.5s hook, then restore 100% reaction audio!
+        h_sec = max(1.0, min(float(hook_vo_seconds), target_dur))
+        tempo_filter = (
+            f"atempo={min(2.0, vo_dur / h_sec):.3f},"
+            if vo_dur > h_sec + 0.05
+            else ""
+        )
+        fade_st = max(0.0, h_sec - 0.15)
+        filter_parts.append(
+            f"[0:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,"
+            f"apad=whole_dur={target_dur:.3f},atrim=0:{target_dur:.3f},asetpts=PTS-STARTPTS,"
+            f"volume=0.20:enable='lt(t,{h_sec:.2f})'[bg_a]"
+        )
+        filter_parts.append(
+            f"[1:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,"
+            f"{tempo_filter}atrim=0:{h_sec:.3f},afade=t=out:st={fade_st:.2f}:d=0.15,"
+            f"apad=whole_dur={target_dur:.3f},atrim=0:{target_dur:.3f},asetpts=PTS-STARTPTS,volume=1.0[vo_a]"
+        )
+        filter_parts.append(
+            f"[bg_a][vo_a]amix=inputs=2:duration=first:dropout_transition=0.2:normalize=0,{loudnorm_expr}[aout]"
+        )
+    elif source_has_audio and has_vo:
         filter_parts.append(
             f"[0:a]aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,"
             f"apad=whole_dur={target_dur:.3f},atrim=0:{target_dur:.3f},asetpts=PTS-STARTPTS,volume=0.25[bg_a]"

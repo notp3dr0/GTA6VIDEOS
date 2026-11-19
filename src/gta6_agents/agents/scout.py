@@ -838,8 +838,9 @@ class ScoutAgent:
         duration: float,
         clip_dur: float,
         capture_cfg: dict[str, Any],
+        heatmap: list[dict[str, Any]] | None = None,
     ) -> list[float]:
-        """Generate unseen hot offsets + rolling 4-min slices across a fresh streamer VOD."""
+        """Generate unseen viral YouTube Most-Replayed heatmap peaks first, then hot offsets + rolling 4-min slices."""
         intro_skip = float(capture_cfg.get("vod_intro_skip_sec", 180.0))
         rolling_step = max(60.0, float(capture_cfg.get("vod_rolling_step_sec", 240.0)))
         max_slices = max(1, int(capture_cfg.get("max_unseen_slices_per_vod_per_scan", 8)))
@@ -847,6 +848,27 @@ class ScoutAgent:
 
         candidate_offsets: list[float] = []
         seen_offs: set[int] = set()
+
+        # Priority 0: Real YouTube "Most Replayed" heatmap viral peaks (ported from moments.py!)
+        if heatmap and duration > 0.0:
+            try:
+                from gta6_agents.agents.moment_finder import extract_heatmap_moments
+
+                hm_moments = extract_heatmap_moments(
+                    heatmap,
+                    duration,
+                    top_k=max_slices,
+                    min_sec=max(12.0, clip_dur - 5.0),
+                    max_sec=max(clip_dur, 28.0),
+                    intro_skip_sec=min(45.0, intro_skip),
+                )
+                for m in hm_moments:
+                    key_i = int(m.start_sec)
+                    if key_i not in seen_offs:
+                        seen_offs.add(key_i)
+                        candidate_offsets.append(m.start_sec)
+            except Exception:
+                pass
 
         for off in hot_offsets:
             if duration <= 0.0 or (off + clip_dur + 5.0 <= duration):
@@ -1075,6 +1097,7 @@ class ScoutAgent:
                     duration=duration,
                     clip_dur=clip_dur,
                     capture_cfg=capture_cfg,
+                    heatmap=entry.get("heatmap") if isinstance(entry.get("heatmap"), list) else None,
                 )
                 slice_angles_pt = [
                     (

@@ -197,23 +197,92 @@ class ClipperEditorAgent:
             )
             cues = cues_from_script(fallback_script, total_duration_sec=clip_duration)
 
-        # 2. Build broadcast .ass overlay (HookBanner + CaptionCenter + optional CreditTag)
+        # 1b. Auto EN->PT-BR localization for international live segments (ported from translate.py + Hydrogen Swarm)
+        from gta6_agents.agents.hydrogen_swarm import (
+            detect_english_text,
+            scan_transcript_for_secrets,
+            translate_cues_to_ptbr,
+        )
+        from gta6_agents.video.facecam import detect_facecam_and_game_offset
+        from gta6_agents.video.quality_gate import verify_rendered_clip
+
+        joined_speech = " ".join(c.text for c in cues).strip()
+        is_english_segment = (
+            plan.language.lower().startswith("pt")
+            and bool(joined_speech)
+            and detect_english_text(joined_speech)
+        )
+        hook_text_resolved = plan.hook_on_screen
+        if is_english_segment:
+            cues, translated_hook = await translate_cues_to_ptbr(
+                cues,
+                hook_text=hook_text_resolved,
+                dry_run=self.config.dry_run,
+            )
+            if translated_hook and not plan.for_real_oficial_campaign:
+                hook_text_resolved = translated_hook
+
+        # Auto-log clean Leonida secret/easter-egg leads into memory/secrets.csv (blocking glitches/exploits/leaks)
+        if joined_speech and not used_synthetic:
+            scan_transcript_for_secrets(
+                joined_speech,
+                source_channel=plan.source.creator_handle,
+                source_url=plan.source.url,
+                start_sec=plan.start_sec,
+                memory_dir=self.config.memory_dir,
+            )
+
+        # 2. Automatic Facecam Split-Screen detection (ported from facecam.py + cut.py react layout)
         video_cfg = (self.config.settings or {}).get("video_pipeline", {}) or {}
+        src_meta = plan.source.metadata or {}
         burn_captions = bool(video_cfg.get("burn_captions", True))
         burn_hook = bool(video_cfg.get("burn_hook_banner", True))
         burn_credit_watermark = video_cfg.get("burn_credit_watermark")
         default_hook_dur = 2.0 if plan.for_real_oficial_campaign else 2.5
         hook_duration_sec = float(video_cfg.get("hook_duration_sec", default_hook_dur))
-        layout_mode = str(video_cfg.get("layout_mode", "blur_pad_hud"))
-        crf = int(video_cfg.get("crf", 20))
+
+        base_layout = str(src_meta.get("channel_layout") or video_cfg.get("layout_mode", "blur_pad_hud"))
+        crf = int(src_meta.get("channel_crf") or video_cfg.get("crf", 20))
         loudnorm_lufs = float(video_cfg.get("loudnorm_lufs", -14.0))
+        accent_ass_bgr = str(src_meta.get("subtitle_accent_ass_bgr") or "&H0000EAFF")
+        caption_style_mode = str(video_cfg.get("caption_style_mode", "kinetic_word"))
+        auto_react = bool(video_cfg.get("auto_react_split_screen", True))
+
+        explicit_cam = str(src_meta.get("explicit_cam_box") or "").strip() or None
+        cam_box: tuple[float, float, float, float] | None = None
+        cam_side = "right"
+        game_crop_x: int | None = None
+        effective_layout = base_layout
+
+        if (auto_react or base_layout in ("react", "facecam") or explicit_cam) and (
+            not used_synthetic or explicit_cam is not None
+        ):
+            cam_det = await asyncio.to_thread(
+                detect_facecam_and_game_offset,
+                source_segment,
+                0.0,
+                clip_duration,
+                explicit_cam,
+            )
+            if cam_det.mode == "cam" and cam_det.box is not None and cam_det.has_gameplay:
+                cam_box = cam_det.box
+                cam_side = cam_det.cam_side
+                game_crop_x = cam_det.game_crop_x
+                effective_layout = "facecam" if base_layout == "facecam" else "react"
 
         # Rule #10: ZERO watermark or logo burned on video frame for Real Oficial campaign
         if plan.for_real_oficial_campaign or burn_credit_watermark is False:
             credit_text = ""
         else:
             credit_text = _format_creator_credit(plan.source.creator_handle)
-        hook_text = plan.hook_on_screen if burn_hook else ""
+
+        hydrogen_meta = src_meta.get("hydrogen_enrichment") or {}
+        hook_meta = hydrogen_meta.get("hook") if isinstance(hydrogen_meta, dict) else {}
+        reaction_title = ""
+        if effective_layout == "react" and not plan.for_real_oficial_campaign and isinstance(hook_meta, dict):
+            reaction_title = str(hook_meta.get("reaction_title") or "")[:64]
+
+        hook_text = hook_text_resolved if burn_hook else ""
         ass_cues = cues if burn_captions else []
 
         ass_path = clip_work_dir / f"{plan.id}.ass"
@@ -225,14 +294,26 @@ class ClipperEditorAgent:
             ass_path,
             hook_duration_sec,
             clip_duration,
+            accent_ass_bgr=accent_ass_bgr,
+            style_mode=caption_style_mode,
+            layout_mode=effective_layout,
+            reaction_title=reaction_title,
         )
 
-        # 3. Synthesize optional voiceover narration
+        # 3. Synthesize optional voiceover narration (or 2.5s stock neural hook for EN->PT-BR clips)
         voiceover_path: Path | None = None
-        if plan.voiceover_script and plan.voiceover_script.strip():
+        hook_vo_only = False
+        vo_text = (plan.voiceover_script or "").strip()
+        if not vo_text and is_english_segment and hook_text:
+            vo_text = hook_text
+            hook_vo_only = True
+        elif is_english_segment and vo_text:
+            hook_vo_only = True
+
+        if vo_text:
             vo_target = clip_work_dir / f"{plan.id}_voiceover.mp3"
             voiceover_path = await synthesize_voiceover(
-                text=plan.voiceover_script,
+                text=vo_text,
                 language=plan.language,
                 config=self.config,
                 output_mp3=vo_target,
@@ -249,10 +330,33 @@ class ClipperEditorAgent:
             voiceover_path,
             0.0,
             clip_duration,
-            layout_mode,
+            effective_layout,
             crf,
             loudnorm_lufs,
+            cam_box=cam_box,
+            cam_side=cam_side,
+            game_crop_x=game_crop_x,
+            hook_voiceover_only=hook_vo_only,
         )
+
+        # 5. Technical Pre-Upload Quality Gate & JSON sidecar (ported from scripts/check.py)
+        gate_report = await asyncio.to_thread(
+            verify_rendered_clip,
+            output_video,
+            plan,
+            "",
+            min_duration_sec=1.0 if self.config.dry_run else 5.0,
+            max_duration_sec=58.0,
+            write_sidecar=True,
+            layout_mode=effective_layout,
+        )
+        if not gate_report.passed:
+            logger.warning(
+                "QualityGate flagged clip %s (%s): %s",
+                clip_id,
+                output_video.name,
+                ", ".join(gate_report.failures),
+            )
 
         rendered = RenderedClip(
             id=clip_id,

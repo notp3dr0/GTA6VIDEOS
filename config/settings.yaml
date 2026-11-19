@@ -48,6 +48,8 @@ video_pipeline:
   min_clip_sec: 10
   max_clip_sec: 45
   layout_mode: "blur_pad_hud"
+  auto_react_split_screen: true  # Detecta webcam do streamer e ativa split-screen 9:16 (730px cam + 1190px gameplay)
+  caption_style_mode: "kinetic_word"  # Legendas palavra-por-palavra com destaque animado na cor do canal + filtro anti-palavrao
   burn_captions: true
   burn_hook_banner: true
   burn_credit_watermark: false  # REGRA #10 DA CAMPANHA: PROIBIDO logo ou marca d'agua na tela!

@@ -751,6 +751,37 @@ class LiveHypeMonitorAgent:
             if len(targets) >= max_concurrent:
                 break
 
+        # Keyless Twitch Public GQL supplement (ported from streams.py/twitch.py) to fill remaining live slots!
+        if len(targets) < max_concurrent and not self.config.dry_run:
+            try:
+                from gta6_agents.agents.trend_radar import discover_twitch_live_gql
+
+                gql_hits = await discover_twitch_live_gql(
+                    game_names=["Grand Theft Auto VI", "GTA VI"],
+                    language_filter="pt",
+                    limit=max_concurrent * 2,
+                )
+                for hit in gql_hits:
+                    if len(targets) >= max_concurrent:
+                        break
+                    h_norm = f"@{hit.channel_login.lower()}"
+                    if h_norm in seen_handles or hit.channel_login.lower() in blacklist:
+                        continue
+                    seen_handles.add(h_norm)
+                    s_key = re.sub(r"[^A-Za-z0-9_-]", "_", hit.channel_login)[:24] or "tw_live"
+                    targets.append(
+                        {
+                            "stream_key": s_key,
+                            "target_url": hit.url,
+                            "creator_handle": f"@{hit.channel_login}",
+                            "streamer_name": hit.display_name,
+                            "for_campaign": False,
+                            "twitch_login": hit.channel_login,
+                        }
+                    )
+            except Exception as exc:
+                logger.debug("Keyless Twitch GQL supplement skipped: %s", exc)
+
         self._cached_live_targets = targets
         self._last_discovery_mono = now_mono
         return targets

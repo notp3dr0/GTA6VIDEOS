@@ -75,11 +75,17 @@ class MultiAgentOrchestrator:
         self.analytics = AnalyticsLearningAgent(self.config, self.store)
         self.notifier = RemoteNotifier(self.config, self.store)
 
+        from gta6_agents.agents.hydrogen_swarm import HydrogenContentSwarm
         from gta6_agents.agents.live_hype_monitor import LiveHypeMonitorAgent
         from gta6_agents.orchestrator.multi_channel import MultiChannelCoordinator
         from gta6_agents.orchestrator.tri_engine_pool import TriEnginePool
 
         self.hype_monitor = LiveHypeMonitorAgent(self.config, self.store)
+        self.hydrogen_swarm = HydrogenContentSwarm(
+            max_concurrency=6,
+            dry_run=self.config.dry_run,
+            memory_dir=self.config.memory_dir,
+        )
 
         try:
             self.multi_channel: MultiChannelCoordinator | None = MultiChannelCoordinator(
@@ -96,7 +102,7 @@ class MultiAgentOrchestrator:
             self.tri_engine_pool = None
 
         # Concurrency semaphores tuned for 2nd PC autonomous execution
-        self.worker_semaphore = asyncio.BoundedSemaphore(3)
+        self.worker_semaphore = asyncio.BoundedSemaphore(4)
         self.render_semaphore = asyncio.BoundedSemaphore(2)
 
     def _primary_language(self) -> str:
@@ -369,7 +375,10 @@ class MultiAgentOrchestrator:
             candidates = []
 
         selected_candidates: list[SourceCandidate] = []
+        channel_angle_for_swarm = ""
         if active_mc_channel and self.multi_channel is not None:
+            ch_profile = self.multi_channel.get_channel(active_mc_channel)
+            channel_angle_for_swarm = ch_profile.editorial_angle
             today_str = self.multi_channel._today_brt_str()
             for cand in candidates:
                 if len(selected_candidates) >= max(0, max_items):
@@ -386,6 +395,9 @@ class MultiAgentOrchestrator:
                 if claimed:
                     updated_meta = dict(cand.metadata)
                     updated_meta["target_channel_id"] = active_mc_channel
+                    updated_meta["channel_layout"] = ch_profile.layout
+                    updated_meta["subtitle_accent_ass_bgr"] = ch_profile.subtitle_accent_ass_bgr
+                    updated_meta["channel_crf"] = ch_profile.ffmpeg_crf
                     selected_candidates.append(
                         cand.model_copy(
                             update={
@@ -397,6 +409,17 @@ class MultiAgentOrchestrator:
                     )
         else:
             selected_candidates = list(candidates)[: max(0, max_items)]
+
+        # Fan out across parallel Hydrogen workers (Hooks + EN->PT-BR detection + Leonida Secrets scanner)
+        if selected_candidates and getattr(self, "hydrogen_swarm", None) is not None:
+            try:
+                await self.hydrogen_swarm.enrich_candidates_parallel(
+                    selected_candidates,
+                    channel_angle=channel_angle_for_swarm,
+                    for_campaign=include_campaign and self.config.real_oficial_enabled,
+                )
+            except Exception as exc:
+                logger.debug("HydrogenContentSwarm enrichment note: %s", exc)
 
         worker_results = await asyncio.gather(
             *(

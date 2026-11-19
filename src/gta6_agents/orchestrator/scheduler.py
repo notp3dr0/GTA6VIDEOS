@@ -224,6 +224,29 @@ class DailyScheduler:
             logger.exception("Scheduled learning loop failed: %s", exc)
             await self.orchestrator.notifier.notify_error("Scheduled Analytics Learning Loop", exc)
 
+    async def _run_hydrogen_questions_trends_radar(self) -> None:
+        """Every 6h, run Hydrogen Questions Harvester (r/GTA6 & r/GTA) + YouTube Velocity Trend Radar."""
+        if self.config.dry_run:
+            return
+        try:
+            from gta6_agents.agents.hydrogen_swarm import harvest_reddit_questions
+            from gta6_agents.agents.trend_radar import scan_youtube_trend_velocity
+
+            questions, trends = await asyncio.gather(
+                harvest_reddit_questions(memory_dir=self.config.memory_dir),
+                scan_youtube_trend_velocity(query="GTA 6 gameplay pt br", max_age_hours=24.0, limit=10),
+                return_exceptions=True,
+            )
+            q_cnt = len(questions) if isinstance(questions, list) else 0
+            t_cnt = len(trends) if isinstance(trends, list) else 0
+            logger.info(
+                "Hydrogen Questions & Trend Velocity Radar: %d clustered player questions, %d high-velocity GTA 6 videos.",
+                q_cnt,
+                t_cnt,
+            )
+        except Exception as exc:
+            logger.debug("Hydrogen Questions & Trend Velocity Radar note: %s", exc)
+
     def configure_jobs(self) -> list[dict[str, Any]]:
         """Register all 60 daily 5-channel slots, Skorpion turbo burst, 30m Fresh VOD radar, Telegram poll, and 5h AI recovery."""
         mc = getattr(self.orchestrator, "multi_channel", None)
@@ -321,12 +344,21 @@ class DailyScheduler:
             replace_existing=True,
         )
 
-        # 6. Self-improving Analytics Learning Loop every 6 hours
+        # 6. Self-improving Analytics Learning Loop every 6 hours (writes learning_loop.md, scoreboard.csv, payouts.csv)
         self.scheduler.add_job(
             self._run_learning_loop,
             trigger=IntervalTrigger(hours=6, timezone=self.tz),
             id="analytics_learning_6h",
             name="Analytics & CPM Learning Loop (6h)",
+            replace_existing=True,
+        )
+
+        # 7. Hydrogen Multi-Agent Questions Harvester & YouTube Velocity Trend Radar every 6 hours
+        self.scheduler.add_job(
+            self._run_hydrogen_questions_trends_radar,
+            trigger=IntervalTrigger(hours=6, timezone=self.tz),
+            id="hydrogen_questions_trends_6h",
+            name="Hydrogen Questions Harvester & Trend Velocity Radar (6h)",
             replace_existing=True,
         )
 
