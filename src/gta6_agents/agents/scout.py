@@ -1369,10 +1369,12 @@ class ScoutAgent:
             if isinstance(batch, list):
                 discovered.extend(batch)
 
-        # Sort strictly by newest live / newest VOD first!
+        # Sort strictly by newest live (ranked by priority + viewers) / newest VOD first!
         discovered.sort(
             key=lambda c: (
                 float(c.metadata.get("freshness_score", 0.0)),
+                c.virality_score if c.metadata.get("is_live") else 0.0,
+                int(c.metadata.get("viewer_count", 0)) if c.metadata.get("is_live") else 0,
                 float(c.metadata.get("published_ts", 0.0)),
                 c.virality_score,
             ),
